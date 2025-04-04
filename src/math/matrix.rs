@@ -16,7 +16,7 @@ use crate::{
     test_init,
 };
 
-use super::math_errors::MatrixDotError;
+use super::math_errors::{MatrixAddError, MatrixDotError};
 
 const DATA_SIZE: u64 = std::mem::size_of::<f32>() as u64;
 
@@ -32,6 +32,7 @@ pub struct MatrixPipelines {
 
     // Pipelines
     dot_pipeline: ComputePipeline,
+    add_pipeline: ComputePipeline,
 }
 
 impl MatrixPipelines {
@@ -130,22 +131,38 @@ impl MatrixPipelines {
                 push_constant_ranges: &[],
             });
 
-        let dot_shader = device.create_shader_module(include_wgsl!("shaders/dotting.wgsl"));
+        let dot_pipeline = {
+            let shader = device.create_shader_module(include_wgsl!("shaders/dotting.wgsl"));
 
-        let dot_pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
-            label: Some("Matrix Dot Pipeline"),
-            module: &dot_shader,
-            layout: Some(&matrix_matrix_pipeline_layout),
-            cache: None,
-            compilation_options: PipelineCompilationOptions::default(),
-            entry_point: Some("dot_main"),
-        });
+            device.create_compute_pipeline(&ComputePipelineDescriptor {
+                label: Some("Matrix Dot Pipeline"),
+                module: &shader,
+                layout: Some(&matrix_matrix_pipeline_layout),
+                cache: None,
+                compilation_options: PipelineCompilationOptions::default(),
+                entry_point: Some("dot_main"),
+            })
+        };
+
+        let add_pipeline = {
+            let shader = device.create_shader_module(include_wgsl!("shaders/adding.wgsl"));
+
+            device.create_compute_pipeline(&ComputePipelineDescriptor {
+                label: Some("Matrix Add Pipeline"),
+                module: &shader,
+                layout: Some(&matrix_matrix_pipeline_layout),
+                cache: None,
+                compilation_options: PipelineCompilationOptions::default(),
+                entry_point: Some("add_main"),
+            })
+        };
 
         Ok(Self {
             readable_bind_group_layout,
             writable_bind_group_layout,
             matrix_matrix_pipeline_layout,
             dot_pipeline,
+            add_pipeline,
         })
     }
 }
@@ -307,6 +324,65 @@ impl Matrix {
 
         Ok(())
     }
+
+    /// Adds the matrices in `source1` and `source2` and stores it in `destination`
+    pub fn add(
+        source1: &Matrix,
+        source2: &Matrix,
+        destination: &Matrix,
+    ) -> Result<(), Box<dyn Error>> {
+        // Make sure that the gpu is initialzied
+        test_init("Matrix::add")?;
+        // Check to see if the matrix rows and coloumns are the same
+        if source1.cols != source2.cols || source1.cols != destination.cols {
+            return Err(Box::new(MatrixAddError(
+                "Source 1 cols do not match Source 2 cols or destinaiton cols".to_string(),
+            )));
+        }
+        if source1.rows != source2.rows || source1.rows != destination.rows {
+            return Err(Box::new(MatrixAddError(
+                "Source 1 rows do not match Source 2 rows or destinaiton rows".to_string(),
+            )));
+        }
+
+        // Run the add pipeline
+        let device = unsafe { get_device() };
+        let queue = unsafe { get_queue() };
+        let pipeline_info = unsafe { get_pipelines() };
+
+        let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor {
+            label: Some("Matrix Add Command Encoder"),
+        });
+
+        {
+            // Get the workgroup size
+            let (dispatch_width, dispatch_height) = compute_workgroup_size_2d(
+                (destination.rows, destination.cols),
+                (WORK_GROUP_SIZE_2D, WORK_GROUP_SIZE_2D),
+            );
+
+            // Begin the compute pass
+            let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor {
+                label: Some("Matrix Add Compute Pass"),
+                timestamp_writes: None,
+            });
+
+            // Set the pipeline
+            compute_pass.set_pipeline(&pipeline_info.add_pipeline);
+
+            // Set the bind groups
+            compute_pass.set_bind_group(0, &source1.readable_bind_group, &[]);
+            compute_pass.set_bind_group(1, &source2.readable_bind_group, &[]);
+            compute_pass.set_bind_group(2, &destination.writable_bind_group, &[]);
+
+            // Dispatch the workgroups
+            compute_pass.dispatch_workgroups(dispatch_width, dispatch_height, 1);
+        }
+
+        queue.submit(Some(encoder.finish()));
+
+        Ok(())
+    }
 }
 
 impl PartialEq for Matrix {
@@ -349,6 +425,8 @@ impl PartialEq for Matrix {
             (get_buffer(&buffer_1, device), get_buffer(&buffer_2, device))
         };
 
+        // println!("mat1: {:#?}", mat1);
+        // println!("mat2: {:#?}", mat2);
         // TODO: Check for transpose
         for (val1, val2) in mat1.iter().zip(mat2.iter()) {
             if val1 != val2 {
