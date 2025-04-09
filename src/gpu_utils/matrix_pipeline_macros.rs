@@ -90,8 +90,8 @@ macro_rules! matrix_dot_pipline {
                 );
 
                 (
-                    source1_dispatch_width * source2_dispatch_width,
-                    source1_dispatch_height * source2_dispatch_height,
+                    source1_dispatch_width,
+                    source1_dispatch_height * source2_dispatch_width,
                 )
             };
 
