@@ -25,3 +25,43 @@ pub fn bench_matrix_dot(c: &mut Criterion) {
         })
     });
 }
+
+pub fn bench_matrix_dot_big(c: &mut Criterion) {
+    gpu_math::init();
+
+    let mat1 = Matrix::new(
+        (1000, 1000),
+        Some({
+            let mut vec = Vec::with_capacity(1000 * 1000);
+            for _ in 0..1000 {
+                for j in 0..1000 {
+                    vec.push(j as f32);
+                }
+            }
+            vec
+        }),
+    )
+    .expect("Failed");
+
+    let mat2 = Matrix::new(
+        (1000, 1000),
+        Some({
+            let mut vec = Vec::with_capacity(1000 * 1000);
+            for _ in 0..1000 {
+                for j in 0..1000 {
+                    vec.push(j as f32);
+                }
+            }
+            vec
+        }),
+    )
+    .expect("Failed");
+
+    let dest = Matrix::new((1000, 1000), None).expect("Failed");
+
+    c.bench_function("dot_big", |b| {
+        b.iter(|| {
+            Matrix::dot(&mat1, &mat2, &dest).expect("Failed");
+        })
+    });
+}

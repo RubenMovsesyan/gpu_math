@@ -14,3 +14,14 @@ impl Display for GpuMathNotInitializedError {
 }
 
 impl Error for GpuMathNotInitializedError {}
+
+#[derive(Debug)]
+pub struct DeviceNotFoundError;
+
+impl Display for DeviceNotFoundError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "The Metal Device was not found")
+    }
+}
+
+impl Error for DeviceNotFoundError {}

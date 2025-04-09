@@ -1,6 +1,6 @@
 use wgpu::{Buffer, BufferDescriptor, BufferUsages, CommandEncoder, Device, Maintain, MapMode};
 
-pub mod bind_group_macro;
+pub mod matrix_pipeline_macros;
 
 pub const WORK_GROUP_SIZE: u32 = 256;
 pub const WORK_GROUP_SIZE_2D: u32 = 16;
