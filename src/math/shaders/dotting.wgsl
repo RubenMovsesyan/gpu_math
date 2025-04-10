@@ -89,7 +89,6 @@ fn load_into_shared_mem(a_location: vec2<u32>, b_location: vec2<u32>, workgroup_
     let b_col = b_location.y;
 
     let a_rows = a_dimensions.x;
-    // let b_cols = b_dimensions.x;
     let b_rows = b_dimensions.x;
 
     let a_index = a_row * a_rows + a_col;
@@ -115,9 +114,6 @@ fn sum_workgroup_matrices(output_location: vec2<u32>, workgroup_id: vec2<u32>) {
 
     let output_index = row * output_rows + col;
     atomic_add_f32(output_index, sum);
-    // atomic_add_f32(output_index, 1.0);
-    // atomic_add_f32(output_index, f32(output_index));
-    // atomic_add_f32(output_index, f32(val));
 }
 
 
