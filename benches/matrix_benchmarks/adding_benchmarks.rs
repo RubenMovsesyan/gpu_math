@@ -79,3 +79,46 @@ pub fn bench_matrix_add_big(c: &mut Criterion) {
         });
     });
 }
+
+pub fn bench_matrix_add_scalar(c: &mut Criterion) {
+    let gpu_math = GpuMath::new();
+
+    let mat1 = Matrix::new(
+        &gpu_math,
+        (3, 3),
+        Some(vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+    )
+    .expect("Failed");
+
+    let dest = Matrix::new(&gpu_math, (3, 3), None).expect("Failed");
+
+    c.bench_function("add_scalar", |b| {
+        b.iter(|| {
+            Matrix::add_scalar(&mat1, 1.0, &dest).expect("Failed");
+        })
+    });
+}
+
+pub fn bench_matrix_add_scalar_big(c: &mut Criterion) {
+    let gpu_math = GpuMath::new();
+
+    let mat1 = Matrix::new(
+        &gpu_math,
+        (1000, 1000),
+        Some(
+            (0..(1000 * 1000))
+                .into_iter()
+                .map(|v| v as f32)
+                .collect::<Vec<f32>>(),
+        ),
+    )
+    .expect("Failed");
+
+    let dest = Matrix::new(&gpu_math, (1000, 1000), None).expect("Failed");
+
+    c.bench_function("add_scalar_big", |b| {
+        b.iter(|| {
+            Matrix::add_scalar(&mat1, 1.0, &dest).expect("Failed");
+        })
+    });
+}

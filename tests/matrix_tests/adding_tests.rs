@@ -127,4 +127,38 @@ mod tests {
 
         assert_eq!(dest, expected);
     }
+
+    #[test]
+    fn test_matrix_adding_scalar_big() {
+        let gpu_math = GpuMath::new();
+
+        let mat1 = Matrix::new(
+            &gpu_math,
+            (1000, 1000),
+            Some(
+                (0..(1000 * 1000))
+                    .into_iter()
+                    .map(|v| v as f32)
+                    .collect::<Vec<f32>>(),
+            ),
+        )
+        .expect("Failed");
+
+        let dest = Matrix::new(&gpu_math, (1000, 1000), None).expect("Failed");
+        let expected = Matrix::new(
+            &gpu_math,
+            (1000, 1000),
+            Some(
+                (0..(1000 * 1000))
+                    .into_iter()
+                    .map(|v| (v + 1) as f32)
+                    .collect::<Vec<f32>>(),
+            ),
+        )
+        .expect("Failed");
+
+        Matrix::add_scalar(&mat1, 1.0, &dest).expect("Failed");
+
+        assert_eq!(dest, expected);
+    }
 }
