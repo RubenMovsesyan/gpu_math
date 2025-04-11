@@ -1,11 +1,11 @@
-use std::{borrow::Cow, collections::HashMap, error::Error, fmt::Display, rc::Rc};
+use std::{error::Error, fmt::Display, rc::Rc};
 
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
     BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages,
     CommandEncoderDescriptor, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor,
     Device, PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor, Queue,
-    ShaderModuleDescriptor, ShaderSource, ShaderStages,
+    ShaderStages, include_wgsl,
     util::{BufferInitDescriptor, DeviceExt},
 };
 
@@ -13,10 +13,9 @@ use crate::{
     GpuMath,
     errors::GpuMathNotInitializedError,
     gpu_utils::{
-        WORK_GROUP_SIZE, WORK_GROUP_SIZE_2D, compute_workgroup_size, compute_workgroup_size_2d,
-        get_buffer, read_buffer,
+        WORK_GROUP_SIZE, WORK_GROUP_SIZE_2D, compute_workgroup_size_2d, get_buffer, read_buffer,
     },
-    matrix_dot_pipline, matrix_matrix_1d_pipeline, matrix_matrix_2d_pipeline,
+    matrix_dot_pipline, matrix_matrix_2d_pipeline, matrix_scalar_pipline,
 };
 
 use super::math_errors::{MatrixAddError, MatrixDotError};
@@ -29,10 +28,12 @@ const MIN_DIMENSION: f64 = WORK_GROUP_SIZE as f64;
 pub struct MatrixPipelines {
     // Bind Group Layouts
     readable_bind_group_layout: BindGroupLayout,
+    scalar_bind_group_layout: BindGroupLayout,
     writable_bind_group_layout: BindGroupLayout,
 
     // Pipeline Layouts
     matrix_matrix_pipeline_layout: PipelineLayout,
+    matrix_scalar_pipeline_layout: PipelineLayout,
 
     // Maximum number of rows or columns in a matrix for computation efficiency
     max_dimension: f64,
@@ -40,67 +41,55 @@ pub struct MatrixPipelines {
     // Pipelines
     dot_pipeline: ComputePipeline,
     add_pipeline: ComputePipeline,
+    add_scalar_pipeline: ComputePipeline,
 }
 
 impl MatrixPipelines {
     fn compile_pipelines(
         device: &Device,
-        max_dimension: f64,
         matrix_matrix_pipeline_layout: &PipelineLayout,
-    ) -> (ComputePipeline, ComputePipeline) {
-        let pipeline_compilaiton_hm = {
-            let /* mut */ options = HashMap::new();
-            // options.insert("MAX_DIMENSION".to_string(), max_dimension);
-            options
-        };
-
+        matrix_scalar_pipeline_layout: &PipelineLayout,
+    ) -> (ComputePipeline, ComputePipeline, ComputePipeline) {
         let dot_pipeline = {
-            // let shader = device.create_shader_module(include_wgsl!("shaders/dotting.wgsl"));
-            let shader = device.create_shader_module(ShaderModuleDescriptor {
-                label: Some("Matrix Dot Shader"),
-                source: ShaderSource::Wgsl(Cow::Owned(
-                    include_str!("shaders/dotting.wgsl")
-                        .replace("MAX_DIMENSION", &max_dimension.to_string()),
-                )),
-            });
+            let shader = device.create_shader_module(include_wgsl!("shaders/dotting.wgsl"));
 
             device.create_compute_pipeline(&ComputePipelineDescriptor {
                 label: Some("Matrix Dot Pipeline"),
                 module: &shader,
                 layout: Some(matrix_matrix_pipeline_layout),
                 cache: None,
-                compilation_options: PipelineCompilationOptions {
-                    constants: &pipeline_compilaiton_hm,
-                    ..Default::default()
-                },
+                compilation_options: PipelineCompilationOptions::default(),
                 entry_point: Some("dot_main"),
             })
         };
 
         let add_pipeline = {
-            // let shader = device.create_shader_module(include_wgsl!("shaders/adding.wgsl"));
-            let shader = device.create_shader_module(ShaderModuleDescriptor {
-                label: Some("Matrix Add Shader"),
-                source: ShaderSource::Wgsl(Cow::Owned(
-                    include_str!("shaders/adding.wgsl")
-                        .replace("MAX_DIMENSION", &max_dimension.to_string()),
-                )),
-            });
+            let shader = device.create_shader_module(include_wgsl!("shaders/adding.wgsl"));
 
             device.create_compute_pipeline(&ComputePipelineDescriptor {
                 label: Some("Matrix Add Pipeline"),
                 module: &shader,
                 layout: Some(matrix_matrix_pipeline_layout),
                 cache: None,
-                compilation_options: PipelineCompilationOptions {
-                    constants: &pipeline_compilaiton_hm,
-                    ..Default::default()
-                },
+                compilation_options: PipelineCompilationOptions::default(),
                 entry_point: Some("add_main"),
             })
         };
 
-        (dot_pipeline, add_pipeline)
+        let add_scalar_pipeline = {
+            let shader = device.create_shader_module(include_wgsl!("shaders/adding_scalar.wgsl"));
+
+            device.create_compute_pipeline(&ComputePipelineDescriptor {
+                label: Some("Matrix Add Scalar Pipeline"),
+                module: &shader,
+                layout: Some(&matrix_scalar_pipeline_layout),
+                cache: None,
+                compilation_options: PipelineCompilationOptions::default(),
+                entry_point: Some("add_scalar_main"),
+            })
+        };
+
+        (dot_pipeline, add_pipeline, add_scalar_pipeline)
     }
 
     pub fn init(device: &Device) -> Result<Self, GpuMathNotInitializedError> {
@@ -134,6 +123,25 @@ impl MatrixPipelines {
                     // Transpose
                     BindGroupLayoutEntry {
                         binding: 2,
+                        visibility: ShaderStages::COMPUTE,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                ],
+            });
+
+        // Create the readable bind group layout with the scalar buffer too
+        let scalar_bind_group_layout =
+            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                label: Some("Scalar Readable Bind Group Layout"),
+                entries: &[
+                    // Matrix Buffer
+                    BindGroupLayoutEntry {
+                        binding: 0,
                         visibility: ShaderStages::COMPUTE,
                         ty: BindingType::Buffer {
                             ty: BufferBindingType::Uniform,
@@ -185,6 +193,7 @@ impl MatrixPipelines {
                     },
                 ],
             });
+
         // This is the pipeline layout for a Matrix Matrix operation
         let matrix_matrix_pipeline_layout =
             device.create_pipeline_layout(&PipelineLayoutDescriptor {
@@ -197,16 +206,34 @@ impl MatrixPipelines {
                 push_constant_ranges: &[],
             });
 
-        let (dot_pipeline, add_pipeline) =
-            Self::compile_pipelines(device, MIN_DIMENSION, &matrix_matrix_pipeline_layout);
+        // This is the pipeline layout for a matrix scalar operation
+        let matrix_scalar_pipeline_layout =
+            device.create_pipeline_layout(&PipelineLayoutDescriptor {
+                label: Some("Matrix Pipeline Layout"),
+                bind_group_layouts: &[
+                    &readable_bind_group_layout,
+                    &scalar_bind_group_layout,
+                    &writable_bind_group_layout,
+                ],
+                push_constant_ranges: &[],
+            });
+
+        let (dot_pipeline, add_pipeline, add_scalar_pipeline) = Self::compile_pipelines(
+            device,
+            &matrix_matrix_pipeline_layout,
+            &matrix_scalar_pipeline_layout,
+        );
 
         Ok(Self {
             readable_bind_group_layout,
+            scalar_bind_group_layout,
             writable_bind_group_layout,
             matrix_matrix_pipeline_layout,
+            matrix_scalar_pipeline_layout,
             max_dimension: MIN_DIMENSION,
             dot_pipeline,
             add_pipeline,
+            add_scalar_pipeline,
         })
     }
 
@@ -215,14 +242,15 @@ impl MatrixPipelines {
         let nearest_power_of_2 = 2f64.powi(f64::log2(new_dimension).ceil() as i32);
 
         if nearest_power_of_2 > self.max_dimension {
-            let (dot_pipeline, add_pipeline) = Self::compile_pipelines(
+            let (dot_pipeline, add_pipeline, add_scalar_pipeline) = Self::compile_pipelines(
                 device,
-                nearest_power_of_2,
                 &self.matrix_matrix_pipeline_layout,
+                &self.matrix_scalar_pipeline_layout,
             );
 
             self.dot_pipeline = dot_pipeline;
             self.add_pipeline = add_pipeline;
+            self.add_scalar_pipeline = add_scalar_pipeline;
 
             self.max_dimension = nearest_power_of_2;
         }
@@ -242,10 +270,12 @@ pub struct Matrix {
     dimensions: Buffer,
     data: Buffer,
     transpose: Buffer,
+    scalar: Buffer,
 
     // Bind Groups
     readable_bind_group: BindGroup,
     writable_bind_group: BindGroup,
+    scalar_bind_group: BindGroup,
 }
 
 impl Matrix {
@@ -286,6 +316,13 @@ impl Matrix {
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
         });
 
+        let scalar = device.create_buffer(&BufferDescriptor {
+            label: Some("Matrix Scalar"),
+            mapped_at_creation: false,
+            size: DATA_SIZE,
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+        });
+
         let readable_bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: Some("Matrix Readable Bind Group"),
             layout: &pipeline_info.readable_bind_group_layout,
@@ -304,6 +341,18 @@ impl Matrix {
                 BindGroupEntry {
                     binding: 2,
                     resource: transpose.as_entire_binding(),
+                },
+            ],
+        });
+
+        let scalar_bind_group = device.create_bind_group(&BindGroupDescriptor {
+            label: Some("Matrix Scalar Bind Group"),
+            layout: &pipeline_info.scalar_bind_group_layout,
+            entries: &[
+                // Scalar Uniform
+                BindGroupEntry {
+                    binding: 0,
+                    resource: scalar.as_entire_binding(),
                 },
             ],
         });
@@ -338,9 +387,11 @@ impl Matrix {
             cols: shape.1,
             dimensions,
             data: buffer,
+            scalar,
             transpose,
             readable_bind_group,
             writable_bind_group,
+            scalar_bind_group,
         })
     }
 
@@ -391,7 +442,6 @@ impl Matrix {
         }
 
         // Run the add pipeline
-
         matrix_matrix_2d_pipeline!(
             &destination.device,
             &destination.queue,
@@ -399,6 +449,42 @@ impl Matrix {
             &destination.pipeline_info.add_pipeline,
             source1,
             source2,
+            destination
+        );
+
+        Ok(())
+    }
+
+    pub fn add_scalar(
+        source: &Matrix,
+        scalar: f32,
+        destination: &Matrix,
+    ) -> Result<(), Box<dyn Error>> {
+        // Check to make sure the source and destination matrices are the same size
+        if source.cols != destination.cols {
+            return Err(Box::new(MatrixAddError(
+                "Source cols do not match Destination cols".to_string(),
+            )));
+        }
+
+        if source.rows != destination.rows {
+            return Err(Box::new(MatrixAddError(
+                "Source rows do not match Destination rows".to_string(),
+            )));
+        }
+
+        // write the scalar to the scalar buffer
+        source
+            .queue
+            .write_buffer(&source.scalar, 0, bytemuck::cast_slice(&[scalar]));
+
+        // Run the add scalar pipeline
+        matrix_scalar_pipline!(
+            &destination.device,
+            &destination.queue,
+            "Matrix Add Scalar",
+            &source.pipeline_info.add_scalar_pipeline,
+            source,
             destination
         );
 

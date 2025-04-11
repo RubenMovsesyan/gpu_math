@@ -5,61 +5,25 @@ mod tests {
     #[test]
     fn test_matrix_dotting() {
         let gpu_math = GpuMath::new();
-        const GROUP_SIZE: usize = 32;
-        const GROUP_SIZE_2: usize = 16;
 
         let mat1 = Matrix::new(
-            // (16, 16),
             &gpu_math,
-            (GROUP_SIZE_2 as u32, GROUP_SIZE as u32),
-            Some({
-                let mut out_vec = Vec::with_capacity(GROUP_SIZE_2 * GROUP_SIZE);
-
-                for _ in 0..GROUP_SIZE_2 {
-                    out_vec.append(
-                        &mut (0..GROUP_SIZE)
-                            .into_iter()
-                            .map(|v| v as f32)
-                            .collect::<Vec<f32>>(),
-                    );
-                }
-
-                out_vec
-            }),
-            // (3, 3),
-            // Some(vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
-            // Some((0..256).into_iter().map(|n| n as f32).collect::<Vec<f32>>()),
+            (3, 3),
+            Some(vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
         )
         .expect("Failed");
 
         let mat2 = Matrix::new(
-            // (16, 16),
-            // (3, 3),
-            // Some(vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
-            // Some((0..256).into_iter().map(|n| n as f32).collect::<Vec<f32>>()),
             &gpu_math,
-            (GROUP_SIZE as u32, GROUP_SIZE_2 as u32),
-            Some({
-                let mut out_vec = Vec::with_capacity(GROUP_SIZE * GROUP_SIZE_2);
-
-                for _ in 0..GROUP_SIZE {
-                    out_vec.append(
-                        &mut (0..GROUP_SIZE_2)
-                            .into_iter()
-                            .map(|v| v as f32)
-                            .collect::<Vec<f32>>(),
-                    );
-                }
-
-                out_vec
-            }),
+            (3, 3),
+            Some(vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
         )
         .expect("Failed");
 
-        // let dest = Matrix::new((3, 3), None).expect("Failed");
+        let dest = Matrix::new(&gpu_math, (3, 3), None).expect("Failed");
         // let dest = Matrix::new((16, 16), None).expect("Failed");
-        let dest = Matrix::new(&gpu_math, (GROUP_SIZE_2 as u32, GROUP_SIZE_2 as u32), None)
-            .expect("Failed");
+        // let dest = Matrix::new(&gpu_math, (GROUP_SIZE_2 as u32, GROUP_SIZE_2 as u32), None)
+        // .expect("Failed");
 
         Matrix::dot(&mat1, &mat2, &dest).expect("Failed");
 
@@ -277,7 +241,7 @@ mod tests {
         )
         .expect("Failed");
 
-        println!("dest: {}", dest);
+        // println!("dest: {}", dest);
         // println!("expe: {}", expected);
 
         assert_eq!(dest, expected);

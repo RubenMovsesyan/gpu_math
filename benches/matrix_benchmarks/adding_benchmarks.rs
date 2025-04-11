@@ -27,3 +27,55 @@ pub fn bench_matrix_add(c: &mut Criterion) {
         })
     });
 }
+
+pub fn bench_matrix_add_big(c: &mut Criterion) {
+    let gpu_math = GpuMath::new();
+
+    let mat1 = Matrix::new(
+        &gpu_math,
+        (1000, 1000),
+        Some({
+            let mut output = Vec::new();
+
+            for _ in 0..1000 {
+                output.push(
+                    (0..1000)
+                        .into_iter()
+                        .map(|i| i as f32)
+                        .collect::<Vec<f32>>(),
+                );
+            }
+
+            output.into_iter().flatten().collect::<Vec<f32>>()
+        }),
+    )
+    .expect("Failed");
+
+    let mat2 = Matrix::new(
+        &gpu_math,
+        (1000, 1000),
+        Some({
+            let mut output = Vec::new();
+
+            for _ in 0..1000 {
+                output.push(
+                    (0..1000)
+                        .into_iter()
+                        .map(|i| i as f32)
+                        .collect::<Vec<f32>>(),
+                );
+            }
+
+            output.into_iter().flatten().collect::<Vec<f32>>()
+        }),
+    )
+    .expect("Failed");
+
+    let dest = Matrix::new(&gpu_math, (1000, 1000), None).expect("Failed");
+
+    c.bench_function("add_big", |b| {
+        b.iter(|| {
+            Matrix::add(&mat1, &mat2, &dest).expect("Failed");
+        });
+    });
+}
