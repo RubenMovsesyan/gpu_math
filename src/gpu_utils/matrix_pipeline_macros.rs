@@ -115,14 +115,14 @@ macro_rules! matrix_dot_pipline {
                     (WORK_GROUP_SIZE_2D, WORK_GROUP_SIZE_2D),
                 );
 
-                let (source2_dispatch_width, _source2_dispatch_height) = compute_workgroup_size_2d(
+                let (_source2_dispatch_width, source2_dispatch_height) = compute_workgroup_size_2d(
                     ($source2.rows, $source2.cols),
                     (WORK_GROUP_SIZE_2D, WORK_GROUP_SIZE_2D),
                 );
 
                 (
                     source1_dispatch_width,
-                    source1_dispatch_height * source2_dispatch_width,
+                    source1_dispatch_height * source2_dispatch_height,
                 )
             };
 

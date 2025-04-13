@@ -4,23 +4,36 @@ mod tests {
 
     #[test]
     fn test_matrix_dotting() {
+        const ROWS: u32 = 16;
+        const COLS: u32 = 24;
+
         let gpu_math = GpuMath::new();
 
         let mat1 = Matrix::new(
             &gpu_math,
-            (3, 3),
-            Some(vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+            (ROWS, COLS),
+            Some(
+                (0..(ROWS * COLS))
+                    .into_iter()
+                    .map(|v| v as f32)
+                    .collect::<Vec<f32>>(),
+            ),
         )
         .expect("Failed");
 
         let mat2 = Matrix::new(
             &gpu_math,
-            (3, 3),
-            Some(vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+            (COLS, ROWS),
+            Some(
+                (0..(ROWS * COLS))
+                    .into_iter()
+                    .map(|v| v as f32)
+                    .collect::<Vec<f32>>(),
+            ),
         )
         .expect("Failed");
 
-        let dest = Matrix::new(&gpu_math, (3, 3), None).expect("Failed");
+        let dest = Matrix::new(&gpu_math, (ROWS, ROWS), None).expect("Failed");
         // let dest = Matrix::new((16, 16), None).expect("Failed");
         // let dest = Matrix::new(&gpu_math, (GROUP_SIZE_2 as u32, GROUP_SIZE_2 as u32), None)
         // .expect("Failed");
@@ -34,10 +47,10 @@ mod tests {
         )
         .expect("Failed");
 
-        println!("mat1: {}", mat1);
-        println!("mat2: {}", mat2);
-        println!("dest: {}", dest);
-        println!("expe: {}", expected);
+        // println!("mat1: {}", mat1);
+        // println!("mat2: {}", mat2);
+        // println!("dest: {}", dest);
+        // println!("expe: {}", expected);
 
         assert_eq!(dest, expected);
     }
@@ -79,6 +92,8 @@ mod tests {
         let dest = Matrix::new(&gpu_math, (1000, 1000), None).expect("Failed");
 
         Matrix::dot(&mat1, &mat2, &dest).expect("Failed");
+
+        println!("{}", dest);
 
         let expected = Matrix::new(
             &gpu_math,

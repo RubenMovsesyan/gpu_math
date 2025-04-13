@@ -89,30 +89,41 @@ fn load_into_shared_mem(a_location: vec2<u32>, b_location: vec2<u32>, workgroup_
     let b_col = b_location.y;
 
     let a_rows = a_dimensions.x;
+    let a_cols = a_dimensions.y;
     let b_rows = b_dimensions.x;
+    let b_cols = b_dimensions.y;
 
-    let a_index = a_row * a_rows + a_col;
-    let b_index = b_row * b_rows + b_col;
+    let a_index = a_row * a_cols + a_col;
+    let b_index = b_row * b_cols + b_col;
 
-    mat_a_window[wg_row][wg_col] = matrix_a[a_index];
-    mat_b_window[wg_row][wg_col] = matrix_b[b_index];
+    if (a_row < a_rows && a_col < a_cols) {
+        mat_a_window[wg_row][wg_col] = matrix_a[a_index];
+    } else {
+        mat_a_window[wg_row][wg_col] = 0.0;
+    }
+
+    if (b_row < b_rows && b_col < b_cols) {
+        mat_b_window[wg_row][wg_col] = matrix_b[b_index];
+    } else {
+        mat_b_window[wg_row][wg_col] = 0.0;
+    }
 }
 
-fn sum_workgroup_matrices(output_location: vec2<u32>, workgroup_id: vec2<u32>) {
+fn sum_workgroup_matrices(output_location: vec2<u32>, limit: u32, workgroup_id: vec2<u32>) {
     let wg_row = workgroup_id.x;
     let wg_col = workgroup_id.y;
 
     let row = output_location.x;
     let col = output_location.y;
 
-    let output_rows = output_dimensions.x;
+    let output_cols = output_dimensions.y;
 
     var sum = 0.0;
-    for (var k: u32 = 0; k < WORKGROUP_SIZE; k++) {
-        sum += mat_a_window[wg_row][k] * mat_b_window[wg_col][k];
+    for (var k: u32 = 0; k < limit; k++) {
+        sum += mat_a_window[wg_row][k] * mat_b_window[k][wg_col];
     }
 
-    let output_index = row * output_rows + col;
+    let output_index = row * output_cols + col;
     atomic_add_f32(output_index, sum);
 }
 
@@ -124,6 +135,7 @@ fn dot_main(
     @builtin(local_invocation_index) local_index: u32,
     @builtin(workgroup_id) workgroup_id: vec3<u32>,
 ) {
+
     let a_rows = a_dimensions.x;
     let a_cols = a_dimensions.y;
 
@@ -136,11 +148,20 @@ fn dot_main(
     let workgroup_row = local_id.x;
     let workgroup_col = local_id.y;
 
-    let a_row_block_id = workgroup_id.x % (u32(ceil(f32(a_rows) / f32(WORKGROUP_SIZE))));
-    let a_col_block_id = workgroup_id.y % (u32(ceil(f32(a_cols) / f32(WORKGROUP_SIZE))));
+    let total_row_workgroups = u32(ceil(f32(a_rows) / f32(WORKGROUP_SIZE)));
+    let total_col_workgroups = u32((ceil(f32(b_cols) / f32(WORKGROUP_SIZE))) * (ceil(f32(a_cols) / f32(WORKGROUP_SIZE))));
 
-    let b_row_block_id = workgroup_id.x / (a_rows / WORKGROUP_SIZE);
-    let b_col_block_id = workgroup_id.y / (a_cols / WORKGROUP_SIZE);
+    let total_a_row_workgroups = total_row_workgroups;
+    let total_a_col_workgroups = u32(ceil(f32(a_cols) / f32(WORKGROUP_SIZE)));
+
+    let total_b_row_workgroups = total_a_col_workgroups;
+    let total_b_col_workgroups = u32(ceil(f32(b_cols) / f32(WORKGROUP_SIZE)));
+
+    let a_row_block_id = workgroup_id.x;
+    let a_col_block_id = workgroup_id.y / total_b_col_workgroups;
+
+    let b_row_block_id = workgroup_id.y / total_b_col_workgroups;
+    let b_col_block_id = workgroup_id.y % total_b_col_workgroups;
 
     let output_row_block_id = a_row_block_id;
     let output_col_block_id = b_col_block_id;
@@ -148,16 +169,39 @@ fn dot_main(
     let a_row = (a_row_block_id * WORKGROUP_SIZE) + workgroup_row;
     let a_col = (a_col_block_id * WORKGROUP_SIZE) + workgroup_col;
 
-    let b_row = (b_row_block_id * WORKGROUP_SIZE) + workgroup_col;
-    let b_col = (b_col_block_id * WORKGROUP_SIZE) + workgroup_row;
+    let b_row = (b_row_block_id * WORKGROUP_SIZE) + workgroup_row;
+    let b_col = (b_col_block_id * WORKGROUP_SIZE) + workgroup_col;
 
     let output_row = (output_row_block_id * WORKGROUP_SIZE) + workgroup_row;
     let output_col = (output_col_block_id * WORKGROUP_SIZE) + workgroup_col;
 
+    var a_row_limit = WORKGROUP_SIZE;
+    var a_col_limit = WORKGROUP_SIZE;
+    var b_row_limit = WORKGROUP_SIZE;
+    var b_col_limit = WORKGROUP_SIZE;
+
+    if (a_row_block_id >= a_rows / WORKGROUP_SIZE) {
+        a_row_limit = a_rows % WORKGROUP_SIZE;
+    }
+
+    if (a_col_block_id >= total_a_col_workgroups) {
+        a_col_limit = a_cols % WORKGROUP_SIZE;
+    }
+
+    if (b_row_block_id >= b_rows / WORKGROUP_SIZE) {
+        b_row_limit = b_rows % WORKGROUP_SIZE;
+    }
+
+    if (b_col_block_id >= b_cols / WORKGROUP_SIZE) {
+        b_col_limit = b_cols % WORKGROUP_SIZE;
+    }
+
+
     load_into_shared_mem(vec2<u32>(a_row, a_col), vec2<u32>(b_row, b_col), local_id.xy);
+
     workgroupBarrier();
 
     if (output_row < output_rows && output_col < output_cols) {
-        sum_workgroup_matrices(vec2<u32>(output_row, output_col), local_id.xy);
+        sum_workgroup_matrices(vec2<u32>(output_row, output_col), a_col_limit, local_id.xy);
     }
 }
