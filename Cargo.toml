@@ -14,5 +14,10 @@ wgpu = "24.0.3"
 criterion = "0.5.1"
 
 [[bench]]
-name = "matrix_benches"
+name = "matrix_adding_benches"
+harness = false
+
+
+[[bench]]
+name = "matrix_dotting_benches"
 harness = false

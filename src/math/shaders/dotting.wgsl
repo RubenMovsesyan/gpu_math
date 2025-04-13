@@ -44,8 +44,8 @@ const MIN_DIMENSION: u32 = 256;
 const WORKGROUP_SIZE: u32 = 16;
 const TILE_SIZE: u32 = 512;
 
-var<workgroup> mat_a_window: array<array<f32, WORKGROUP_SIZE>, WORKGROUP_SIZE>;
-var<workgroup> mat_b_window: array<array<f32, WORKGROUP_SIZE>, WORKGROUP_SIZE>;
+var<workgroup> mat_a_window: array<array<f32, WORKGROUP_SIZE + 1>, WORKGROUP_SIZE>;
+var<workgroup> mat_b_window: array<array<f32, WORKGROUP_SIZE + 1>, WORKGROUP_SIZE>;
 
 fn u32_to_f32(val: u32) -> f32 {
     return bitcast<f32>(val);
@@ -103,9 +103,9 @@ fn load_into_shared_mem(a_location: vec2<u32>, b_location: vec2<u32>, workgroup_
     }
 
     if (b_row < b_rows && b_col < b_cols) {
-        mat_b_window[wg_row][wg_col] = matrix_b[b_index];
+        mat_b_window[wg_row][wg_col + 1] = matrix_b[b_index];
     } else {
-        mat_b_window[wg_row][wg_col] = 0.0;
+        mat_b_window[wg_row][wg_col + 1] = 0.0;
     }
 }
 
@@ -120,7 +120,7 @@ fn sum_workgroup_matrices(output_location: vec2<u32>, limit: u32, workgroup_id: 
 
     var sum = 0.0;
     for (var k: u32 = 0; k < limit; k++) {
-        sum += mat_a_window[wg_row][k] * mat_b_window[k][wg_col];
+        sum += mat_a_window[wg_row][k] * mat_b_window[k][wg_col + 1];
     }
 
     let output_index = row * output_cols + col;
