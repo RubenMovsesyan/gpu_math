@@ -22,5 +22,9 @@ name = "matrix_subing_benches"
 harness = false
 
 [[bench]]
+name = "matrix_multing_benches"
+harness = false
+
+[[bench]]
 name = "matrix_dotting_benches"
 harness = false

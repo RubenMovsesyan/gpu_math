@@ -5,6 +5,7 @@ pub mod matrix_pipeline_macros;
 pub const WORK_GROUP_SIZE: u32 = 256;
 pub const WORK_GROUP_SIZE_2D: u32 = 16;
 
+#[allow(dead_code)]
 pub fn compute_workgroup_size(elements: u32, work_group_size: u32) -> u32 {
     (elements + work_group_size - 1) / work_group_size
 }

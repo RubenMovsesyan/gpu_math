@@ -4,7 +4,7 @@ use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
     BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages,
     CommandEncoderDescriptor, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor,
-    Device, PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor, Queue,
+    Device, Maintain, PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor, Queue,
     ShaderStages, include_wgsl,
     util::{BufferInitDescriptor, DeviceExt},
 };
@@ -44,6 +44,7 @@ pub struct MatrixPipelines {
     add_scalar_pipeline: ComputePipeline,
     sub_pipeline: ComputePipeline,
     sub_scalar_pipeline: ComputePipeline,
+    mult_scalar_pipeline: ComputePipeline,
 }
 
 impl MatrixPipelines {
@@ -52,6 +53,7 @@ impl MatrixPipelines {
         matrix_matrix_pipeline_layout: &PipelineLayout,
         matrix_scalar_pipeline_layout: &PipelineLayout,
     ) -> (
+        ComputePipeline,
         ComputePipeline,
         ComputePipeline,
         ComputePipeline,
@@ -123,12 +125,26 @@ impl MatrixPipelines {
             })
         };
 
+        let mult_scalar_pipeline = {
+            let shader = device.create_shader_module(include_wgsl!("shaders/mult_scalar.wgsl"));
+
+            device.create_compute_pipeline(&ComputePipelineDescriptor {
+                label: Some("Matrix Mult Scalar Pipeline"),
+                module: &shader,
+                layout: Some(&matrix_scalar_pipeline_layout),
+                cache: None,
+                compilation_options: PipelineCompilationOptions::default(),
+                entry_point: Some("mult_scalar_main"),
+            })
+        };
+
         (
             dot_pipeline,
             add_pipeline,
             add_scalar_pipeline,
             sub_pipeline,
             sub_scalar_pipeline,
+            mult_scalar_pipeline,
         )
     }
 
@@ -258,12 +274,18 @@ impl MatrixPipelines {
                 push_constant_ranges: &[],
             });
 
-        let (dot_pipeline, add_pipeline, add_scalar_pipeline, sub_pipeline, sub_scalar_pipeline) =
-            Self::compile_pipelines(
-                device,
-                &matrix_matrix_pipeline_layout,
-                &matrix_scalar_pipeline_layout,
-            );
+        let (
+            dot_pipeline,
+            add_pipeline,
+            add_scalar_pipeline,
+            sub_pipeline,
+            sub_scalar_pipeline,
+            mult_scalar_pipeline,
+        ) = Self::compile_pipelines(
+            device,
+            &matrix_matrix_pipeline_layout,
+            &matrix_scalar_pipeline_layout,
+        );
 
         Ok(Self {
             readable_bind_group_layout,
@@ -277,6 +299,7 @@ impl MatrixPipelines {
             add_scalar_pipeline,
             sub_pipeline,
             sub_scalar_pipeline,
+            mult_scalar_pipeline,
         })
     }
 
@@ -291,6 +314,7 @@ impl MatrixPipelines {
                 add_scalar_pipeline,
                 sub_pipeline,
                 sub_scalar_pipeline,
+                mult_scalar_pipeline,
             ) = Self::compile_pipelines(
                 device,
                 &self.matrix_matrix_pipeline_layout,
@@ -302,12 +326,14 @@ impl MatrixPipelines {
             self.add_scalar_pipeline = add_scalar_pipeline;
             self.sub_pipeline = sub_pipeline;
             self.sub_scalar_pipeline = sub_scalar_pipeline;
+            self.mult_scalar_pipeline = mult_scalar_pipeline;
 
             self.max_dimension = nearest_power_of_2;
         }
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Matrix {
     // WGPU
@@ -566,7 +592,7 @@ impl Matrix {
         matrix_matrix_2d_pipeline!(
             &destination.device,
             &destination.queue,
-            "Matrix Add",
+            "Matrix Sub",
             &destination.pipeline_info.sub_pipeline,
             source1,
             source2,
@@ -604,13 +630,59 @@ impl Matrix {
         matrix_scalar_pipline!(
             &destination.device,
             &destination.queue,
-            "Matrix Add Scalar",
+            "Matrix Sub Scalar",
             &source.pipeline_info.sub_scalar_pipeline,
             source,
             destination
         );
 
         Ok(())
+    }
+
+    /// Multiplies the scalar value to `source` and stores it in `destination`
+    pub fn mult_scalar(
+        source: &Matrix,
+        scalar: f32,
+        destination: &Matrix,
+    ) -> Result<(), Box<dyn Error>> {
+        // Check to make sure the source and destination matrices are the same size
+        if source.cols != destination.cols {
+            return Err(Box::new(MatrixAddError(
+                "Source cols do not match Destination cols".to_string(),
+            )));
+        }
+
+        if source.rows != destination.rows {
+            return Err(Box::new(MatrixAddError(
+                "Source rows do not match Destination rows".to_string(),
+            )));
+        }
+
+        // write the scalar to the scalar buffer
+        source
+            .queue
+            .write_buffer(&source.scalar, 0, bytemuck::cast_slice(&[scalar]));
+
+        // Run the add scalar pipeline
+        matrix_scalar_pipline!(
+            &destination.device,
+            &destination.queue,
+            "Matrix Mult Scalar",
+            &source.pipeline_info.mult_scalar_pipeline,
+            source,
+            destination
+        );
+
+        Ok(())
+    }
+}
+
+impl Drop for Matrix {
+    fn drop(&mut self) {
+        self.device.poll(Maintain::Wait);
+        self.data.destroy();
+        self.transpose.destroy();
+        self.scalar.destroy();
     }
 }
 

@@ -3,6 +3,7 @@ mod gpu_utils;
 use std::rc::Rc;
 
 // Logging
+#[allow(unused_imports)]
 use log::*;
 
 // error modules
@@ -24,6 +25,7 @@ use wgpu::{
 
 // static mut GPU_MATHS: Option<GpuMath> = None;
 
+#[allow(dead_code)]
 pub struct GpuMath {
     instance: Instance,
     adapter: Adapter,
