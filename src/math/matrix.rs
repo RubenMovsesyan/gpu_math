@@ -42,6 +42,8 @@ pub struct MatrixPipelines {
     dot_pipeline: ComputePipeline,
     add_pipeline: ComputePipeline,
     add_scalar_pipeline: ComputePipeline,
+    sub_pipeline: ComputePipeline,
+    sub_scalar_pipeline: ComputePipeline,
 }
 
 impl MatrixPipelines {
@@ -49,7 +51,13 @@ impl MatrixPipelines {
         device: &Device,
         matrix_matrix_pipeline_layout: &PipelineLayout,
         matrix_scalar_pipeline_layout: &PipelineLayout,
-    ) -> (ComputePipeline, ComputePipeline, ComputePipeline) {
+    ) -> (
+        ComputePipeline,
+        ComputePipeline,
+        ComputePipeline,
+        ComputePipeline,
+        ComputePipeline,
+    ) {
         let dot_pipeline = {
             let shader = device.create_shader_module(include_wgsl!("shaders/dotting.wgsl"));
 
@@ -89,7 +97,39 @@ impl MatrixPipelines {
             })
         };
 
-        (dot_pipeline, add_pipeline, add_scalar_pipeline)
+        let sub_pipeline = {
+            let shader = device.create_shader_module(include_wgsl!("shaders/subing.wgsl"));
+
+            device.create_compute_pipeline(&ComputePipelineDescriptor {
+                label: Some("Matrix Sub Pipeline"),
+                module: &shader,
+                layout: Some(matrix_matrix_pipeline_layout),
+                cache: None,
+                compilation_options: PipelineCompilationOptions::default(),
+                entry_point: Some("sub_main"),
+            })
+        };
+
+        let sub_scalar_pipeline = {
+            let shader = device.create_shader_module(include_wgsl!("shaders/subing_scalar.wgsl"));
+
+            device.create_compute_pipeline(&ComputePipelineDescriptor {
+                label: Some("Matrix Sub Scalar Pipeline"),
+                module: &shader,
+                layout: Some(&matrix_scalar_pipeline_layout),
+                cache: None,
+                compilation_options: PipelineCompilationOptions::default(),
+                entry_point: Some("sub_scalar_main"),
+            })
+        };
+
+        (
+            dot_pipeline,
+            add_pipeline,
+            add_scalar_pipeline,
+            sub_pipeline,
+            sub_scalar_pipeline,
+        )
     }
 
     pub fn init(device: &Device) -> Result<Self, GpuMathNotInitializedError> {
@@ -218,11 +258,12 @@ impl MatrixPipelines {
                 push_constant_ranges: &[],
             });
 
-        let (dot_pipeline, add_pipeline, add_scalar_pipeline) = Self::compile_pipelines(
-            device,
-            &matrix_matrix_pipeline_layout,
-            &matrix_scalar_pipeline_layout,
-        );
+        let (dot_pipeline, add_pipeline, add_scalar_pipeline, sub_pipeline, sub_scalar_pipeline) =
+            Self::compile_pipelines(
+                device,
+                &matrix_matrix_pipeline_layout,
+                &matrix_scalar_pipeline_layout,
+            );
 
         Ok(Self {
             readable_bind_group_layout,
@@ -234,6 +275,8 @@ impl MatrixPipelines {
             dot_pipeline,
             add_pipeline,
             add_scalar_pipeline,
+            sub_pipeline,
+            sub_scalar_pipeline,
         })
     }
 
@@ -242,7 +285,13 @@ impl MatrixPipelines {
         let nearest_power_of_2 = 2f64.powi(f64::log2(new_dimension).ceil() as i32);
 
         if nearest_power_of_2 > self.max_dimension {
-            let (dot_pipeline, add_pipeline, add_scalar_pipeline) = Self::compile_pipelines(
+            let (
+                dot_pipeline,
+                add_pipeline,
+                add_scalar_pipeline,
+                sub_pipeline,
+                sub_scalar_pipeline,
+            ) = Self::compile_pipelines(
                 device,
                 &self.matrix_matrix_pipeline_layout,
                 &self.matrix_scalar_pipeline_layout,
@@ -251,6 +300,8 @@ impl MatrixPipelines {
             self.dot_pipeline = dot_pipeline;
             self.add_pipeline = add_pipeline;
             self.add_scalar_pipeline = add_scalar_pipeline;
+            self.sub_pipeline = sub_pipeline;
+            self.sub_scalar_pipeline = sub_scalar_pipeline;
 
             self.max_dimension = nearest_power_of_2;
         }
@@ -455,6 +506,7 @@ impl Matrix {
         Ok(())
     }
 
+    /// Adds the scalar value to `source` and stores it in `destination`
     pub fn add_scalar(
         source: &Matrix,
         scalar: f32,
@@ -484,6 +536,76 @@ impl Matrix {
             &destination.queue,
             "Matrix Add Scalar",
             &source.pipeline_info.add_scalar_pipeline,
+            source,
+            destination
+        );
+
+        Ok(())
+    }
+
+    /// Subtracts `source2` from `source1` and stores it in `destination`
+    pub fn sub(
+        source1: &Matrix,
+        source2: &Matrix,
+        destination: &Matrix,
+    ) -> Result<(), Box<dyn Error>> {
+        // Make sure that the gpu is initialzied
+        // Check to see if the matrix rows and coloumns are the same
+        if source1.cols != source2.cols || source1.cols != destination.cols {
+            return Err(Box::new(MatrixAddError(
+                "Source 1 cols do not match Source 2 cols or destinaiton cols".to_string(),
+            )));
+        }
+        if source1.rows != source2.rows || source1.rows != destination.rows {
+            return Err(Box::new(MatrixAddError(
+                "Source 1 rows do not match Source 2 rows or destinaiton rows".to_string(),
+            )));
+        }
+
+        // Run the add pipeline
+        matrix_matrix_2d_pipeline!(
+            &destination.device,
+            &destination.queue,
+            "Matrix Add",
+            &destination.pipeline_info.sub_pipeline,
+            source1,
+            source2,
+            destination
+        );
+
+        Ok(())
+    }
+
+    /// Subtracts the scalar value from `source` and stores it in `destination`
+    pub fn sub_scalar(
+        source: &Matrix,
+        scalar: f32,
+        destination: &Matrix,
+    ) -> Result<(), Box<dyn Error>> {
+        // Check to make sure the source and destination matrices are the same size
+        if source.cols != destination.cols {
+            return Err(Box::new(MatrixAddError(
+                "Source cols do not match Destination cols".to_string(),
+            )));
+        }
+
+        if source.rows != destination.rows {
+            return Err(Box::new(MatrixAddError(
+                "Source rows do not match Destination rows".to_string(),
+            )));
+        }
+
+        // write the scalar to the scalar buffer
+        source
+            .queue
+            .write_buffer(&source.scalar, 0, bytemuck::cast_slice(&[scalar]));
+
+        // Run the add scalar pipeline
+        matrix_scalar_pipline!(
+            &destination.device,
+            &destination.queue,
+            "Matrix Add Scalar",
+            &source.pipeline_info.sub_scalar_pipeline,
             source,
             destination
         );

@@ -17,6 +17,9 @@ criterion = "0.5.1"
 name = "matrix_adding_benches"
 harness = false
 
+[[bench]]
+name = "matrix_subing_benches"
+harness = false
 
 [[bench]]
 name = "matrix_dotting_benches"

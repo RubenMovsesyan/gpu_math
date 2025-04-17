@@ -1,8 +1,7 @@
-use criterion::Criterion;
-
+use criterion::{Criterion, criterion_group, criterion_main};
 use gpu_math::{GpuMath, matrix::Matrix};
 
-pub fn bench_matrix_add(c: &mut Criterion) {
+pub fn bench_matrix_sub(c: &mut Criterion) {
     let gpu_math = GpuMath::new();
 
     let mat1 = Matrix::new(
@@ -21,14 +20,14 @@ pub fn bench_matrix_add(c: &mut Criterion) {
 
     let dest = Matrix::new(&gpu_math, (3, 3), None).expect("Failed");
 
-    c.bench_function("add", |b| {
+    c.bench_function("sub", |b| {
         b.iter(|| {
-            Matrix::add(&mat1, &mat2, &dest).expect("Failed");
+            Matrix::sub(&mat1, &mat2, &dest).expect("Failed");
         })
     });
 }
 
-pub fn bench_matrix_add_big(c: &mut Criterion) {
+pub fn bench_matrix_sub_big(c: &mut Criterion) {
     let gpu_math = GpuMath::new();
 
     let mat1 = Matrix::new(
@@ -73,14 +72,14 @@ pub fn bench_matrix_add_big(c: &mut Criterion) {
 
     let dest = Matrix::new(&gpu_math, (1000, 1000), None).expect("Failed");
 
-    c.bench_function("add_big", |b| {
+    c.bench_function("sub_big", |b| {
         b.iter(|| {
-            Matrix::add(&mat1, &mat2, &dest).expect("Failed");
+            Matrix::sub(&mat1, &mat2, &dest).expect("Failed");
         });
     });
 }
 
-pub fn bench_matrix_add_scalar(c: &mut Criterion) {
+pub fn bench_matrix_sub_scalar(c: &mut Criterion) {
     let gpu_math = GpuMath::new();
 
     let mat1 = Matrix::new(
@@ -92,14 +91,14 @@ pub fn bench_matrix_add_scalar(c: &mut Criterion) {
 
     let dest = Matrix::new(&gpu_math, (3, 3), None).expect("Failed");
 
-    c.bench_function("add_scalar", |b| {
+    c.bench_function("sub_scalar", |b| {
         b.iter(|| {
-            Matrix::add_scalar(&mat1, 1.0, &dest).expect("Failed");
+            Matrix::sub_scalar(&mat1, 1.0, &dest).expect("Failed");
         })
     });
 }
 
-pub fn bench_matrix_add_scalar_big(c: &mut Criterion) {
+pub fn bench_matrix_sub_scalar_big(c: &mut Criterion) {
     let gpu_math = GpuMath::new();
 
     let mat1 = Matrix::new(
@@ -116,9 +115,19 @@ pub fn bench_matrix_add_scalar_big(c: &mut Criterion) {
 
     let dest = Matrix::new(&gpu_math, (1000, 1000), None).expect("Failed");
 
-    c.bench_function("add_scalar_big", |b| {
+    c.bench_function("sub_scalar_big", |b| {
         b.iter(|| {
-            Matrix::add_scalar(&mat1, 1.0, &dest).expect("Failed");
+            Matrix::sub_scalar(&mat1, 1.0, &dest).expect("Failed");
         })
     });
 }
+
+criterion_group!(
+    subing_benches,
+    bench_matrix_sub,
+    bench_matrix_sub_big,
+    bench_matrix_sub_scalar,
+    bench_matrix_sub_scalar_big
+);
+
+criterion_main!(subing_benches);
