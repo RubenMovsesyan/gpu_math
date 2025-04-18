@@ -46,6 +46,7 @@ pub struct MatrixPipelines {
     add_in_place_pipeline: ComputePipeline,
     add_scalar_pipeline: ComputePipeline,
     sub_pipeline: ComputePipeline,
+    sub_in_place_pipeline: ComputePipeline,
     sub_scalar_pipeline: ComputePipeline,
     mult_scalar_pipeline: ComputePipeline,
 }
@@ -57,6 +58,7 @@ impl MatrixPipelines {
         matrix_scalar_pipeline_layout: &PipelineLayout,
         matrix_matrix_in_place_pipeline_layout: &PipelineLayout,
     ) -> (
+        ComputePipeline,
         ComputePipeline,
         ComputePipeline,
         ComputePipeline,
@@ -130,6 +132,19 @@ impl MatrixPipelines {
             })
         };
 
+        let sub_in_place_pipeline = {
+            let shader = device.create_shader_module(include_wgsl!("shaders/subing_in_place.wgsl"));
+
+            device.create_compute_pipeline(&ComputePipelineDescriptor {
+                label: Some("Matrix Sub In Place Pipeline"),
+                module: &shader,
+                layout: Some(matrix_matrix_in_place_pipeline_layout),
+                cache: None,
+                compilation_options: PipelineCompilationOptions::default(),
+                entry_point: Some("sub_in_place_main"),
+            })
+        };
+
         let sub_scalar_pipeline = {
             let shader = device.create_shader_module(include_wgsl!("shaders/subing_scalar.wgsl"));
 
@@ -162,6 +177,7 @@ impl MatrixPipelines {
             add_in_place_pipeline,
             add_scalar_pipeline,
             sub_pipeline,
+            sub_in_place_pipeline,
             sub_scalar_pipeline,
             mult_scalar_pipeline,
         )
@@ -307,6 +323,7 @@ impl MatrixPipelines {
             add_in_place_pipeline,
             add_scalar_pipeline,
             sub_pipeline,
+            sub_in_place_pipeline,
             sub_scalar_pipeline,
             mult_scalar_pipeline,
         ) = Self::compile_pipelines(
@@ -329,6 +346,7 @@ impl MatrixPipelines {
             add_in_place_pipeline,
             add_scalar_pipeline,
             sub_pipeline,
+            sub_in_place_pipeline,
             sub_scalar_pipeline,
             mult_scalar_pipeline,
         })
@@ -627,6 +645,34 @@ impl Matrix {
             source1,
             source2,
             destination
+        );
+
+        Ok(())
+    }
+
+    /// Subtracts the contents of `matrix2` from `matrix1`
+    pub fn sub_in_place(matrix1: &Matrix, matrix2: &Matrix) -> Result<(), Box<dyn Error>> {
+        // Make sure that the rows and columns of both matrices match
+        if matrix1.cols != matrix2.cols {
+            return Err(Box::new(MatrixAddError(
+                "Matrix 1 cols do not match Matrix 2 cols".to_string(),
+            )));
+        }
+
+        if matrix1.rows != matrix2.rows {
+            return Err(Box::new(MatrixAddError(
+                "Matrix 1 rows do not match Matrix 2 rows".to_string(),
+            )));
+        }
+
+        // Run the add in place pipeline
+        matrix_matrix_2d_in_place_pipeline!(
+            &matrix1.device,
+            &matrix1.queue,
+            "Matrix Sub in Place",
+            &matrix1.pipeline_info.sub_in_place_pipeline,
+            matrix1,
+            matrix2
         );
 
         Ok(())
