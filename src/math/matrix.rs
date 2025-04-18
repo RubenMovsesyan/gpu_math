@@ -15,7 +15,8 @@ use crate::{
     gpu_utils::{
         WORK_GROUP_SIZE, WORK_GROUP_SIZE_2D, compute_workgroup_size_2d, get_buffer, read_buffer,
     },
-    matrix_dot_pipline, matrix_matrix_2d_pipeline, matrix_scalar_pipline,
+    matrix_dot_pipline, matrix_matrix_2d_in_place_pipeline, matrix_matrix_2d_pipeline,
+    matrix_scalar_pipline,
 };
 
 use super::math_errors::{MatrixAddError, MatrixDotError};
@@ -34,6 +35,7 @@ pub struct MatrixPipelines {
     // Pipeline Layouts
     matrix_matrix_pipeline_layout: PipelineLayout,
     matrix_scalar_pipeline_layout: PipelineLayout,
+    matrix_matrix_in_place_pipeline_layout: PipelineLayout,
 
     // Maximum number of rows or columns in a matrix for computation efficiency
     max_dimension: f64,
@@ -41,6 +43,7 @@ pub struct MatrixPipelines {
     // Pipelines
     dot_pipeline: ComputePipeline,
     add_pipeline: ComputePipeline,
+    add_in_place_pipeline: ComputePipeline,
     add_scalar_pipeline: ComputePipeline,
     sub_pipeline: ComputePipeline,
     sub_scalar_pipeline: ComputePipeline,
@@ -52,7 +55,9 @@ impl MatrixPipelines {
         device: &Device,
         matrix_matrix_pipeline_layout: &PipelineLayout,
         matrix_scalar_pipeline_layout: &PipelineLayout,
+        matrix_matrix_in_place_pipeline_layout: &PipelineLayout,
     ) -> (
+        ComputePipeline,
         ComputePipeline,
         ComputePipeline,
         ComputePipeline,
@@ -83,6 +88,19 @@ impl MatrixPipelines {
                 cache: None,
                 compilation_options: PipelineCompilationOptions::default(),
                 entry_point: Some("add_main"),
+            })
+        };
+
+        let add_in_place_pipeline = {
+            let shader = device.create_shader_module(include_wgsl!("shaders/adding_in_place.wgsl"));
+
+            device.create_compute_pipeline(&ComputePipelineDescriptor {
+                label: Some("Matrix Add In Place Pipeline"),
+                module: &shader,
+                layout: Some(matrix_matrix_in_place_pipeline_layout),
+                cache: None,
+                compilation_options: PipelineCompilationOptions::default(),
+                entry_point: Some("add_in_place_main"),
             })
         };
 
@@ -141,6 +159,7 @@ impl MatrixPipelines {
         (
             dot_pipeline,
             add_pipeline,
+            add_in_place_pipeline,
             add_scalar_pipeline,
             sub_pipeline,
             sub_scalar_pipeline,
@@ -274,9 +293,18 @@ impl MatrixPipelines {
                 push_constant_ranges: &[],
             });
 
+        // This is the pipeline layout for matrix matrix operation in place
+        let matrix_matrix_in_place_pipeline_layout =
+            device.create_pipeline_layout(&PipelineLayoutDescriptor {
+                label: Some("Matrix Matrix In Place Pipeline Layout"),
+                bind_group_layouts: &[&writable_bind_group_layout, &readable_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
         let (
             dot_pipeline,
             add_pipeline,
+            add_in_place_pipeline,
             add_scalar_pipeline,
             sub_pipeline,
             sub_scalar_pipeline,
@@ -285,6 +313,7 @@ impl MatrixPipelines {
             device,
             &matrix_matrix_pipeline_layout,
             &matrix_scalar_pipeline_layout,
+            &matrix_matrix_in_place_pipeline_layout,
         );
 
         Ok(Self {
@@ -293,43 +322,16 @@ impl MatrixPipelines {
             writable_bind_group_layout,
             matrix_matrix_pipeline_layout,
             matrix_scalar_pipeline_layout,
+            matrix_matrix_in_place_pipeline_layout,
             max_dimension: MIN_DIMENSION,
             dot_pipeline,
             add_pipeline,
+            add_in_place_pipeline,
             add_scalar_pipeline,
             sub_pipeline,
             sub_scalar_pipeline,
             mult_scalar_pipeline,
         })
-    }
-
-    pub unsafe fn recompile(&mut self, device: &Device, new_dimension: f64) {
-        // test_init("MatrixPipelines::recompile")?;
-        let nearest_power_of_2 = 2f64.powi(f64::log2(new_dimension).ceil() as i32);
-
-        if nearest_power_of_2 > self.max_dimension {
-            let (
-                dot_pipeline,
-                add_pipeline,
-                add_scalar_pipeline,
-                sub_pipeline,
-                sub_scalar_pipeline,
-                mult_scalar_pipeline,
-            ) = Self::compile_pipelines(
-                device,
-                &self.matrix_matrix_pipeline_layout,
-                &self.matrix_scalar_pipeline_layout,
-            );
-
-            self.dot_pipeline = dot_pipeline;
-            self.add_pipeline = add_pipeline;
-            self.add_scalar_pipeline = add_scalar_pipeline;
-            self.sub_pipeline = sub_pipeline;
-            self.sub_scalar_pipeline = sub_scalar_pipeline;
-            self.mult_scalar_pipeline = mult_scalar_pipeline;
-
-            self.max_dimension = nearest_power_of_2;
-        }
     }
 }
 
@@ -527,6 +529,34 @@ impl Matrix {
             source1,
             source2,
             destination
+        );
+
+        Ok(())
+    }
+
+    /// Adds the contents of `matrix2` to `matrix1`
+    pub fn add_in_place(matrix1: &Matrix, matrix2: &Matrix) -> Result<(), Box<dyn Error>> {
+        // Make sure that the rows and columns of both matrices match
+        if matrix1.cols != matrix2.cols {
+            return Err(Box::new(MatrixAddError(
+                "Matrix 1 cols do not match Matrix 2 cols".to_string(),
+            )));
+        }
+
+        if matrix1.rows != matrix2.rows {
+            return Err(Box::new(MatrixAddError(
+                "Matrix 1 rows do not match Matrix 2 rows".to_string(),
+            )));
+        }
+
+        // Run the add in place pipeline
+        matrix_matrix_2d_in_place_pipeline!(
+            &matrix1.device,
+            &matrix1.queue,
+            "Matrix Add in Place",
+            &matrix1.pipeline_info.add_in_place_pipeline,
+            matrix1,
+            matrix2
         );
 
         Ok(())

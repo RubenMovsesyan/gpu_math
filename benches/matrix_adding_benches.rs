@@ -27,6 +27,64 @@ pub fn bench_matrix_add(c: &mut Criterion) {
     });
 }
 
+pub fn bench_matrix_add_in_place(c: &mut Criterion) {
+    let gpu_math = GpuMath::new();
+
+    let mat1 = Matrix::new(
+        &gpu_math,
+        (3, 3),
+        Some((0..9).into_iter().map(|v| v as f32).collect::<Vec<f32>>()),
+    )
+    .expect("Failed");
+
+    let mat2 = Matrix::new(
+        &gpu_math,
+        (3, 3),
+        Some((0..9).into_iter().map(|v| v as f32).collect::<Vec<f32>>()),
+    )
+    .expect("Failed");
+
+    c.bench_function("add_in_place", |b| {
+        b.iter(|| {
+            Matrix::add_in_place(&mat1, &mat2).expect("Failed");
+        })
+    });
+}
+
+pub fn bench_matrix_add_in_place_big(c: &mut Criterion) {
+    let gpu_math = GpuMath::new();
+
+    let mat1 = Matrix::new(
+        &gpu_math,
+        (1000, 1000),
+        Some(
+            (0..(1000 * 1000))
+                .into_iter()
+                .map(|v| v as f32)
+                .collect::<Vec<f32>>(),
+        ),
+    )
+    .expect("Failed");
+
+    let mat2 = Matrix::new(
+        &gpu_math,
+        (1000, 1000),
+        Some(
+            (0..(1000 * 1000))
+                .into_iter()
+                .map(|v| v as f32)
+                .collect::<Vec<f32>>(),
+        ),
+    )
+    .expect("Failed");
+
+    c.bench_function("add_in_place_big", |b| {
+        b.iter(|| {
+            Matrix::add_in_place(&mat1, &mat2).expect("Failed");
+        });
+    });
+}
+
 pub fn bench_matrix_add_big(c: &mut Criterion) {
     let gpu_math = GpuMath::new();
 
@@ -125,7 +183,9 @@ pub fn bench_matrix_add_scalar_big(c: &mut Criterion) {
 criterion_group!(
     adding_benches,
     bench_matrix_add,
+    bench_matrix_add_in_place,
     bench_matrix_add_big,
+    bench_matrix_add_in_place_big,
     bench_matrix_add_scalar,
     bench_matrix_add_scalar_big
 );

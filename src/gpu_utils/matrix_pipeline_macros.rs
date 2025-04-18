@@ -34,6 +34,40 @@ macro_rules! matrix_matrix_2d_pipeline {
 }
 
 #[macro_export]
+macro_rules! matrix_matrix_2d_in_place_pipeline {
+    ($device:expr, $queue:expr, $label:expr, $pipeline:expr, $source1:expr, $source2:expr) => {
+        let mut encoder = $device.create_command_encoder(&CommandEncoderDescriptor {
+            label: Some(&format!("{} Command Encoder", $label)),
+        });
+
+        {
+            // Get the workgroup size
+            let (dispatch_width, dispatch_height) = compute_workgroup_size_2d(
+                ($source1.rows, $source1.cols),
+                (WORK_GROUP_SIZE_2D, WORK_GROUP_SIZE_2D),
+            );
+
+            // Begin the compute pass
+            let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor {
+                label: Some(&format!("{} Compute Pass", $label)),
+                timestamp_writes: None,
+            });
+
+            // Set the pipelines
+            compute_pass.set_pipeline($pipeline);
+
+            // Set the bind groups
+            compute_pass.set_bind_group(0, &$source1.writable_bind_group, &[]);
+            compute_pass.set_bind_group(1, &$source2.readable_bind_group, &[]);
+
+            compute_pass.dispatch_workgroups(dispatch_width, dispatch_height, 1);
+        }
+
+        $queue.submit(Some(encoder.finish()));
+    };
+}
+
+#[macro_export]
 macro_rules! matrix_matrix_1d_pipeline {
     ($device:expr, $queue:expr, $label:expr, $pipeline:expr, $source1:expr, $source2:expr, $destination:expr) => {
         let mut encoder = $device.create_command_encoder(&CommandEncoderDescriptor {

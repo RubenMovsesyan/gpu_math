@@ -34,6 +34,86 @@ mod tests {
     }
 
     #[test]
+    fn test_matrix_adding_in_place() {
+        let gpu_math = GpuMath::new();
+
+        let mat1 = Matrix::new(
+            &gpu_math,
+            (3, 3),
+            Some((0..9).into_iter().map(|v| v as f32).collect::<Vec<f32>>()),
+        )
+        .expect("Failed");
+
+        let mat2 = Matrix::new(
+            &gpu_math,
+            (3, 3),
+            Some((0..9).into_iter().map(|v| v as f32).collect::<Vec<f32>>()),
+        )
+        .expect("Failed");
+
+        let expected = Matrix::new(
+            &gpu_math,
+            (3, 3),
+            Some(
+                (0..9)
+                    .into_iter()
+                    .map(|v| (v * 2) as f32)
+                    .collect::<Vec<f32>>(),
+            ),
+        )
+        .expect("Failed");
+
+        Matrix::add_in_place(&mat1, &mat2).expect("Failed");
+
+        assert_eq!(mat1, expected);
+    }
+
+    #[test]
+    fn test_matrix_adding_in_place_big() {
+        let gpu_math = GpuMath::new();
+
+        let mat1 = Matrix::new(
+            &gpu_math,
+            (1000, 1000),
+            Some(
+                (0..(1000 * 1000))
+                    .into_iter()
+                    .map(|v| v as f32)
+                    .collect::<Vec<f32>>(),
+            ),
+        )
+        .expect("Failed");
+
+        let mat2 = Matrix::new(
+            &gpu_math,
+            (1000, 1000),
+            Some(
+                (0..(1000 * 1000))
+                    .into_iter()
+                    .map(|v| v as f32)
+                    .collect::<Vec<f32>>(),
+            ),
+        )
+        .expect("Failed");
+
+        let expected = Matrix::new(
+            &gpu_math,
+            (1000, 1000),
+            Some(
+                (0..(1000 * 1000))
+                    .into_iter()
+                    .map(|v| (v * 2) as f32)
+                    .collect::<Vec<f32>>(),
+            ),
+        )
+        .expect("Failed");
+
+        Matrix::add_in_place(&mat1, &mat2).expect("Failed");
+
+        assert_eq!(mat1, expected);
+    }
+
+    #[test]
     fn test_matrix_adding_big() {
         let gpu_math = GpuMath::new();
 
