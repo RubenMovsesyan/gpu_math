@@ -49,6 +49,9 @@ pub struct MatrixPipelines {
     sub_in_place_pipeline: ComputePipeline,
     sub_scalar_pipeline: ComputePipeline,
     mult_scalar_pipeline: ComputePipeline,
+
+    // Vectored Pipelines
+    vectored_add_pipeline: ComputePipeline,
 }
 
 impl MatrixPipelines {
@@ -58,6 +61,7 @@ impl MatrixPipelines {
         matrix_scalar_pipeline_layout: &PipelineLayout,
         matrix_matrix_in_place_pipeline_layout: &PipelineLayout,
     ) -> (
+        ComputePipeline,
         ComputePipeline,
         ComputePipeline,
         ComputePipeline,
@@ -171,6 +175,20 @@ impl MatrixPipelines {
             })
         };
 
+        // Vectored pipelines
+        let vectored_add_pipeline = {
+            let shader = device.create_shader_module(include_wgsl!("shaders/vectored_add.wgsl"));
+
+            device.create_compute_pipeline(&ComputePipelineDescriptor {
+                label: Some("Matrix Vectored Add Pipeline"),
+                module: &shader,
+                layout: Some(&matrix_matrix_pipeline_layout),
+                cache: None,
+                compilation_options: PipelineCompilationOptions::default(),
+                entry_point: Some("vectored_add_main"),
+            })
+        };
+
         (
             dot_pipeline,
             add_pipeline,
@@ -180,6 +198,8 @@ impl MatrixPipelines {
             sub_in_place_pipeline,
             sub_scalar_pipeline,
             mult_scalar_pipeline,
+            // Vectored Pipelines
+            vectored_add_pipeline,
         )
     }
 
@@ -326,6 +346,7 @@ impl MatrixPipelines {
             sub_in_place_pipeline,
             sub_scalar_pipeline,
             mult_scalar_pipeline,
+            vectored_add_pipeline,
         ) = Self::compile_pipelines(
             device,
             &matrix_matrix_pipeline_layout,
@@ -349,6 +370,8 @@ impl MatrixPipelines {
             sub_in_place_pipeline,
             sub_scalar_pipeline,
             mult_scalar_pipeline,
+            // Vector pipelines
+            vectored_add_pipeline,
         })
     }
 }
@@ -361,8 +384,8 @@ pub struct Matrix {
     queue: Rc<Queue>,
     pipeline_info: Rc<MatrixPipelines>,
 
-    rows: u32,
-    cols: u32,
+    pub rows: u32,
+    pub cols: u32,
     // GPU vals
     dimensions: Buffer,
     data: Buffer,
@@ -403,7 +426,7 @@ impl Matrix {
 
         let dimensions = device.create_buffer_init(&BufferInitDescriptor {
             label: Some("Matrix Dimensions Buffer"),
-            contents: bytemuck::cast_slice(&vec![shape.0 as u32, shape.1 as u32]),
+            contents: bytemuck::cast_slice::<u32, u8>(&vec![shape.0 as u32, shape.1 as u32]),
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
         });
 
@@ -492,6 +515,10 @@ impl Matrix {
         })
     }
 
+    pub fn is_vector(&self) -> bool {
+        (self.rows == 1 || self.cols == 1) && !(self.rows == self.cols)
+    }
+
     /// Dots the `source1` and `source2` matrix together and stores the output in `destination`
     pub fn dot(
         source1: &Matrix,
@@ -546,6 +573,43 @@ impl Matrix {
             &destination.pipeline_info.add_pipeline,
             source1,
             source2,
+            destination
+        );
+
+        Ok(())
+    }
+
+    /// Adds the contents of `vector` to `matrix` and stores it in `destination`
+    pub fn vectored_add(
+        matrix: &Matrix,
+        vector: &Matrix,
+        destination: &Matrix,
+    ) -> Result<(), Box<dyn Error>> {
+        // Check if the `vector` matrix is actually a vector
+        if !vector.is_vector() {
+            return Err(Box::new(MatrixAddError(
+                "Vector matrix is not a vector".to_string(),
+            )));
+        }
+
+        // Check if the vector dimensions match the matrix
+        if !(vector.rows == matrix.rows
+            || vector.cols == matrix.cols
+            || vector.rows == matrix.cols
+            || vector.cols == matrix.rows)
+        {
+            return Err(Box::new(MatrixAddError(
+                "Vector dimensions do not match Matrix".to_string(),
+            )));
+        }
+
+        matrix_matrix_2d_pipeline!(
+            &destination.device,
+            &destination.queue,
+            "Matrix Vectored Add",
+            &destination.pipeline_info.vectored_add_pipeline,
+            matrix,
+            vector,
             destination
         );
 

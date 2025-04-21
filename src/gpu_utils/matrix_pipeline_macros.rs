@@ -23,7 +23,7 @@ macro_rules! matrix_matrix_2d_pipeline {
 
             // Set the bind groups
             compute_pass.set_bind_group(0, &$source1.readable_bind_group, &[]);
-            compute_pass.set_bind_group(1, &$source1.readable_bind_group, &[]);
+            compute_pass.set_bind_group(1, &$source2.readable_bind_group, &[]);
             compute_pass.set_bind_group(2, &$destination.writable_bind_group, &[]);
 
             compute_pass.dispatch_workgroups(dispatch_width, dispatch_height, 1);

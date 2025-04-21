@@ -180,6 +180,86 @@ pub fn bench_matrix_add_scalar_big(c: &mut Criterion) {
     });
 }
 
+pub fn bench_matrix_vectored_add(c: &mut Criterion) {
+    let gpu_math = GpuMath::new();
+
+    const ROWS: u32 = 16;
+    const COLS: u32 = 16;
+
+    let mat = Matrix::new(
+        &gpu_math,
+        (ROWS, COLS),
+        Some({
+            let mut out = Vec::with_capacity((ROWS * COLS) as usize);
+
+            for _ in 0..ROWS {
+                for i in 0..COLS {
+                    out.push(i as f32);
+                }
+            }
+
+            out
+        }),
+    )
+    .expect("Failed");
+
+    let vec = Matrix::new(
+        &gpu_math,
+        (1, COLS),
+        Some(
+            (0..COLS)
+                .into_iter()
+                .map(|v| v as f32)
+                .collect::<Vec<f32>>(),
+        ),
+    )
+    .expect("Failed");
+
+    let dest = Matrix::new(&gpu_math, (ROWS, COLS), None).expect("Failed");
+
+    c.bench_function("vectored_add", |b| {
+        b.iter(|| {
+            Matrix::vectored_add(&mat, &vec, &dest).expect("Failed");
+        });
+    });
+}
+
+pub fn bench_matrix_vectored_add_big(c: &mut Criterion) {
+    let gpu_math = GpuMath::new();
+
+    let mat = Matrix::new(
+        &gpu_math,
+        (1000, 900),
+        Some({
+            let mut out = Vec::with_capacity(1000 * 900);
+
+            for _ in 0..1000 {
+                for i in 0..900 {
+                    out.push(i as f32);
+                }
+            }
+
+            out
+        }),
+    )
+    .expect("Failed");
+
+    let vec = Matrix::new(
+        &gpu_math,
+        (1, 900),
+        Some((0..900).into_iter().map(|v| v as f32).collect::<Vec<f32>>()),
+    )
+    .expect("Failed");
+
+    let dest = Matrix::new(&gpu_math, (1000, 900), None).expect("Failed");
+
+    c.bench_function("vectored_add_big", |b| {
+        b.iter(|| {
+            Matrix::vectored_add(&mat, &vec, &dest).expect("Failed");
+        });
+    });
+}
+
 criterion_group!(
     adding_benches,
     bench_matrix_add,
@@ -187,7 +267,9 @@ criterion_group!(
     bench_matrix_add_big,
     bench_matrix_add_in_place_big,
     bench_matrix_add_scalar,
-    bench_matrix_add_scalar_big
+    bench_matrix_add_scalar_big,
+    bench_matrix_vectored_add,
+    bench_matrix_vectored_add_big
 );
 
 criterion_main!(adding_benches);
