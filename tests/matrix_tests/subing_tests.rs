@@ -277,7 +277,7 @@ mod tests {
                 let mut out = Vec::with_capacity((ROWS * COLS) as usize);
 
                 for _ in 0..ROWS {
-                    for i in 0..COLS {
+                    for _ in 0..COLS {
                         out.push(0.0);
                     }
                 }

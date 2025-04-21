@@ -29,6 +29,8 @@ pub struct MatrixPipelines {
     pub sub_in_place_pipeline: ComputePipeline,
     pub sub_scalar_pipeline: ComputePipeline,
     pub mult_scalar_pipeline: ComputePipeline,
+    pub mult_pipeline: ComputePipeline,
+    pub mult_in_place_pipeline: ComputePipeline,
 
     // Vectored Pipelines
     pub vectored_add_pipeline: ComputePipeline,
@@ -44,6 +46,8 @@ impl MatrixPipelines {
         matrix_scalar_pipeline_layout: &PipelineLayout,
         matrix_matrix_in_place_pipeline_layout: &PipelineLayout,
     ) -> (
+        ComputePipeline,
+        ComputePipeline,
         ComputePipeline,
         ComputePipeline,
         ComputePipeline,
@@ -161,6 +165,32 @@ impl MatrixPipelines {
             })
         };
 
+        let mult_pipeline = {
+            let shader = device.create_shader_module(include_wgsl!("shaders/mult.wgsl"));
+
+            device.create_compute_pipeline(&ComputePipelineDescriptor {
+                label: Some("Matrix Mult Pipeline"),
+                module: &shader,
+                layout: Some(&matrix_matrix_pipeline_layout),
+                cache: None,
+                compilation_options: PipelineCompilationOptions::default(),
+                entry_point: Some("mult_main"),
+            })
+        };
+
+        let mult_in_place_pipeline = {
+            let shader = device.create_shader_module(include_wgsl!("shaders/mult_in_place.wgsl"));
+
+            device.create_compute_pipeline(&ComputePipelineDescriptor {
+                label: Some("Matrix Mult In Place Pipeline"),
+                module: &shader,
+                layout: Some(&matrix_matrix_in_place_pipeline_layout),
+                cache: None,
+                compilation_options: PipelineCompilationOptions::default(),
+                entry_point: Some("mult_in_place_main"),
+            })
+        };
+
         // Vectored pipelines
         let vectored_add_pipeline = {
             let shader = device.create_shader_module(include_wgsl!("shaders/vectored_add.wgsl"));
@@ -225,6 +255,8 @@ impl MatrixPipelines {
             sub_in_place_pipeline,
             sub_scalar_pipeline,
             mult_scalar_pipeline,
+            mult_pipeline,
+            mult_in_place_pipeline,
             // Vectored Pipelines
             vectored_add_pipeline,
             vectored_add_in_place_pipeline,
@@ -376,6 +408,8 @@ impl MatrixPipelines {
             sub_in_place_pipeline,
             sub_scalar_pipeline,
             mult_scalar_pipeline,
+            mult_pipeline,
+            mult_in_place_pipeline,
             // Vector pipelines
             vectored_add_pipeline,
             vectored_add_in_place_pipeline,
@@ -403,6 +437,8 @@ impl MatrixPipelines {
             sub_in_place_pipeline,
             sub_scalar_pipeline,
             mult_scalar_pipeline,
+            mult_pipeline,
+            mult_in_place_pipeline,
             // Vector pipelines
             vectored_add_pipeline,
             vectored_add_in_place_pipeline,

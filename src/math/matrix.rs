@@ -560,6 +560,67 @@ impl Matrix {
 
         Ok(())
     }
+
+    /// Multiplies every element of `source1` by `source2` and stores it in `destination`
+    pub fn mult(
+        source1: &Matrix,
+        source2: &Matrix,
+        destination: &Matrix,
+    ) -> Result<(), Box<dyn Error>> {
+        // Make sure that the gpu is initialzied
+        // Check to see if the matrix rows and coloumns are the same
+        if source1.cols != source2.cols || source1.cols != destination.cols {
+            return Err(Box::new(MatrixAddError(
+                "Source 1 cols do not match Source 2 cols or destinaiton cols".to_string(),
+            )));
+        }
+        if source1.rows != source2.rows || source1.rows != destination.rows {
+            return Err(Box::new(MatrixAddError(
+                "Source 1 rows do not match Source 2 rows or destinaiton rows".to_string(),
+            )));
+        }
+
+        // Run the add pipeline
+        matrix_matrix_2d_pipeline!(
+            &destination.device,
+            &destination.queue,
+            "Matrix Mult",
+            &destination.pipeline_info.mult_pipeline,
+            source1,
+            source2,
+            destination
+        );
+
+        Ok(())
+    }
+
+    /// Multiplies the contents of `matrix2` to `matrix1`
+    pub fn mult_in_place(matrix1: &Matrix, matrix2: &Matrix) -> Result<(), Box<dyn Error>> {
+        // Make sure that the rows and columns of both matrices match
+        if matrix1.cols != matrix2.cols {
+            return Err(Box::new(MatrixAddError(
+                "Matrix 1 cols do not match Matrix 2 cols".to_string(),
+            )));
+        }
+
+        if matrix1.rows != matrix2.rows {
+            return Err(Box::new(MatrixAddError(
+                "Matrix 1 rows do not match Matrix 2 rows".to_string(),
+            )));
+        }
+
+        // Run the add in place pipeline
+        matrix_matrix_2d_in_place_pipeline!(
+            &matrix1.device,
+            &matrix1.queue,
+            "Matrix Mult in Place",
+            &matrix1.pipeline_info.mult_in_place_pipeline,
+            matrix1,
+            matrix2
+        );
+
+        Ok(())
+    }
 }
 
 impl Drop for Matrix {
