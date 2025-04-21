@@ -2,6 +2,7 @@ use wgpu::{Buffer, BufferDescriptor, BufferUsages, CommandEncoder, Device, Maint
 
 pub mod matrix_pipeline_macros;
 
+#[allow(dead_code)]
 pub const WORK_GROUP_SIZE: u32 = 256;
 pub const WORK_GROUP_SIZE_2D: u32 = 16;
 

@@ -180,6 +180,162 @@ pub fn bench_matrix_sub_scalar_big(c: &mut Criterion) {
     });
 }
 
+pub fn bench_matrix_vectored_sub(c: &mut Criterion) {
+    let gpu_math = GpuMath::new();
+
+    const ROWS: u32 = 16;
+    const COLS: u32 = 16;
+
+    let mat = Matrix::new(
+        &gpu_math,
+        (ROWS, COLS),
+        Some({
+            let mut out = Vec::with_capacity((ROWS * COLS) as usize);
+
+            for _ in 0..ROWS {
+                for i in 0..COLS {
+                    out.push(i as f32);
+                }
+            }
+
+            out
+        }),
+    )
+    .expect("Failed");
+
+    let vec = Matrix::new(
+        &gpu_math,
+        (1, COLS),
+        Some(
+            (0..COLS)
+                .into_iter()
+                .map(|v| v as f32)
+                .collect::<Vec<f32>>(),
+        ),
+    )
+    .expect("Failed");
+
+    let dest = Matrix::new(&gpu_math, (ROWS, COLS), None).expect("Failed");
+
+    c.bench_function("vectored_sub", |b| {
+        b.iter(|| {
+            Matrix::vectored_sub(&mat, &vec, &dest).expect("Failed");
+        });
+    });
+}
+
+pub fn bench_matrix_vectored_sub_big(c: &mut Criterion) {
+    let gpu_math = GpuMath::new();
+
+    let mat = Matrix::new(
+        &gpu_math,
+        (1000, 900),
+        Some({
+            let mut out = Vec::with_capacity(1000 * 900);
+
+            for _ in 0..1000 {
+                for i in 0..900 {
+                    out.push(i as f32);
+                }
+            }
+
+            out
+        }),
+    )
+    .expect("Failed");
+
+    let vec = Matrix::new(
+        &gpu_math,
+        (1, 900),
+        Some((0..900).into_iter().map(|v| v as f32).collect::<Vec<f32>>()),
+    )
+    .expect("Failed");
+
+    let dest = Matrix::new(&gpu_math, (1000, 900), None).expect("Failed");
+
+    c.bench_function("vectored_sub_big", |b| {
+        b.iter(|| {
+            Matrix::vectored_sub(&mat, &vec, &dest).expect("Failed");
+        });
+    });
+}
+
+fn bench_matrix_vectored_sub_in_place(c: &mut Criterion) {
+    let gpu_math = GpuMath::new();
+
+    const ROWS: u32 = 16;
+    const COLS: u32 = 16;
+
+    let mat = Matrix::new(
+        &gpu_math,
+        (ROWS, COLS),
+        Some({
+            let mut out = Vec::with_capacity((ROWS * COLS) as usize);
+
+            for _ in 0..ROWS {
+                for i in 0..COLS {
+                    out.push(i as f32);
+                }
+            }
+
+            out
+        }),
+    )
+    .expect("Failed");
+
+    let vec = Matrix::new(
+        &gpu_math,
+        (1, COLS),
+        Some(
+            (0..COLS)
+                .into_iter()
+                .map(|v| v as f32)
+                .collect::<Vec<f32>>(),
+        ),
+    )
+    .expect("Failed");
+
+    c.bench_function("vectored_sub_in_place", |b| {
+        b.iter(|| {
+            Matrix::vectored_sub_in_place(&mat, &vec).expect("Failed");
+        });
+    });
+}
+
+fn bench_matrix_vectored_sub_in_place_big(c: &mut Criterion) {
+    let gpu_math = GpuMath::new();
+
+    let mat = Matrix::new(
+        &gpu_math,
+        (1000, 900),
+        Some({
+            let mut out = Vec::with_capacity(1000 * 900);
+
+            for _ in 0..1000 {
+                for i in 0..900 {
+                    out.push(i as f32);
+                }
+            }
+
+            out
+        }),
+    )
+    .expect("Failed");
+
+    let vec = Matrix::new(
+        &gpu_math,
+        (1, 900),
+        Some((0..900).into_iter().map(|v| v as f32).collect::<Vec<f32>>()),
+    )
+    .expect("Failed");
+
+    c.bench_function("vectored_sub_in_place_big", |b| {
+        b.iter(|| {
+            Matrix::vectored_sub_in_place(&mat, &vec).expect("Failed");
+        });
+    });
+}
+
 criterion_group!(
     subing_benches,
     bench_matrix_sub,
@@ -187,7 +343,11 @@ criterion_group!(
     bench_matrix_sub_big,
     bench_matrix_sub_in_place_big,
     bench_matrix_sub_scalar,
-    bench_matrix_sub_scalar_big
+    bench_matrix_sub_scalar_big,
+    bench_matrix_vectored_sub,
+    bench_matrix_vectored_sub_in_place,
+    bench_matrix_vectored_sub_big,
+    bench_matrix_vectored_sub_in_place_big
 );
 
 criterion_main!(subing_benches);

@@ -288,7 +288,7 @@ impl Matrix {
         Ok(())
     }
 
-    /// Adds the contents of `vector` to `matrix` and stores it in `destination`
+    /// Adds the contents of `vector` to `matrix`
     pub fn vectored_add_in_place(matrix: &Matrix, vector: &Matrix) -> Result<(), Box<dyn Error>> {
         // Check if the `vector` matrix is actually a vector
         if !vector.is_vector() {
@@ -390,6 +390,43 @@ impl Matrix {
         Ok(())
     }
 
+    /// Subtracts the contents of `vector` from `matrix` and stores it in `destination`
+    pub fn vectored_sub(
+        matrix: &Matrix,
+        vector: &Matrix,
+        destination: &Matrix,
+    ) -> Result<(), Box<dyn Error>> {
+        // Check if the `vector` matrix is actually a vector
+        if !vector.is_vector() {
+            return Err(Box::new(MatrixAddError(
+                "Vector matrix is not a vector".to_string(),
+            )));
+        }
+
+        // Check if the vector dimensions match the matrix
+        if !(vector.rows == matrix.rows
+            || vector.cols == matrix.cols
+            || vector.rows == matrix.cols
+            || vector.cols == matrix.rows)
+        {
+            return Err(Box::new(MatrixAddError(
+                "Vector dimensions do not match Matrix".to_string(),
+            )));
+        }
+
+        matrix_matrix_2d_pipeline!(
+            &destination.device,
+            &destination.queue,
+            "Matrix Vectored Add",
+            &destination.pipeline_info.vectored_sub_pipeline,
+            matrix,
+            vector,
+            destination
+        );
+
+        Ok(())
+    }
+
     /// Subtracts the contents of `matrix2` from `matrix1`
     pub fn sub_in_place(matrix1: &Matrix, matrix2: &Matrix) -> Result<(), Box<dyn Error>> {
         // Make sure that the rows and columns of both matrices match
@@ -413,6 +450,38 @@ impl Matrix {
             &matrix1.pipeline_info.sub_in_place_pipeline,
             matrix1,
             matrix2
+        );
+
+        Ok(())
+    }
+
+    /// Adds the contents of `vector` to `matrix`
+    pub fn vectored_sub_in_place(matrix: &Matrix, vector: &Matrix) -> Result<(), Box<dyn Error>> {
+        // Check if the `vector` matrix is actually a vector
+        if !vector.is_vector() {
+            return Err(Box::new(MatrixAddError(
+                "Vector matrix is not a vector".to_string(),
+            )));
+        }
+
+        // Check if the vector dimensions match the matrix
+        if !(vector.rows == matrix.rows
+            || vector.cols == matrix.cols
+            || vector.rows == matrix.cols
+            || vector.cols == matrix.rows)
+        {
+            return Err(Box::new(MatrixAddError(
+                "Vector dimensions do not match Matrix".to_string(),
+            )));
+        }
+
+        matrix_matrix_2d_in_place_pipeline!(
+            &matrix.device,
+            &matrix.queue,
+            "Matrix Vectored Add In Place",
+            &matrix.pipeline_info.vectored_sub_in_place_pipeline,
+            matrix,
+            vector
         );
 
         Ok(())
