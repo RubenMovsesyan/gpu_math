@@ -1,380 +1,24 @@
 use std::{error::Error, fmt::Display, rc::Rc};
 
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
-    BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages,
-    CommandEncoderDescriptor, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor,
-    Device, Maintain, PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor, Queue,
-    ShaderStages, include_wgsl,
+    BindGroup, BindGroupDescriptor, BindGroupEntry, Buffer, BufferDescriptor, BufferUsages,
+    CommandEncoderDescriptor, ComputePassDescriptor, Device, Maintain, Queue,
     util::{BufferInitDescriptor, DeviceExt},
 };
 
 use crate::{
     GpuMath,
-    errors::GpuMathNotInitializedError,
-    gpu_utils::{
-        WORK_GROUP_SIZE, WORK_GROUP_SIZE_2D, compute_workgroup_size_2d, get_buffer, read_buffer,
-    },
+    gpu_utils::{WORK_GROUP_SIZE_2D, compute_workgroup_size_2d, get_buffer, read_buffer},
     matrix_dot_pipline, matrix_matrix_2d_in_place_pipeline, matrix_matrix_2d_pipeline,
     matrix_scalar_pipline,
 };
 
-use super::math_errors::{MatrixAddError, MatrixDotError};
+use super::{
+    math_errors::{MatrixAddError, MatrixDotError},
+    matrix_pipelines::MatrixPipelines,
+};
 
 const DATA_SIZE: u64 = std::mem::size_of::<f32>() as u64;
-const MIN_DIMENSION: f64 = WORK_GROUP_SIZE as f64;
-
-#[allow(dead_code)]
-#[derive(Debug)]
-pub struct MatrixPipelines {
-    // Bind Group Layouts
-    readable_bind_group_layout: BindGroupLayout,
-    scalar_bind_group_layout: BindGroupLayout,
-    writable_bind_group_layout: BindGroupLayout,
-
-    // Pipeline Layouts
-    matrix_matrix_pipeline_layout: PipelineLayout,
-    matrix_scalar_pipeline_layout: PipelineLayout,
-    matrix_matrix_in_place_pipeline_layout: PipelineLayout,
-
-    // Maximum number of rows or columns in a matrix for computation efficiency
-    max_dimension: f64,
-
-    // Pipelines
-    dot_pipeline: ComputePipeline,
-    add_pipeline: ComputePipeline,
-    add_in_place_pipeline: ComputePipeline,
-    add_scalar_pipeline: ComputePipeline,
-    sub_pipeline: ComputePipeline,
-    sub_in_place_pipeline: ComputePipeline,
-    sub_scalar_pipeline: ComputePipeline,
-    mult_scalar_pipeline: ComputePipeline,
-
-    // Vectored Pipelines
-    vectored_add_pipeline: ComputePipeline,
-}
-
-impl MatrixPipelines {
-    fn compile_pipelines(
-        device: &Device,
-        matrix_matrix_pipeline_layout: &PipelineLayout,
-        matrix_scalar_pipeline_layout: &PipelineLayout,
-        matrix_matrix_in_place_pipeline_layout: &PipelineLayout,
-    ) -> (
-        ComputePipeline,
-        ComputePipeline,
-        ComputePipeline,
-        ComputePipeline,
-        ComputePipeline,
-        ComputePipeline,
-        ComputePipeline,
-        ComputePipeline,
-        ComputePipeline,
-    ) {
-        let dot_pipeline = {
-            let shader = device.create_shader_module(include_wgsl!("shaders/dotting.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Dot Pipeline"),
-                module: &shader,
-                layout: Some(matrix_matrix_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("dot_main"),
-            })
-        };
-
-        let add_pipeline = {
-            let shader = device.create_shader_module(include_wgsl!("shaders/adding.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Add Pipeline"),
-                module: &shader,
-                layout: Some(matrix_matrix_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("add_main"),
-            })
-        };
-
-        let add_in_place_pipeline = {
-            let shader = device.create_shader_module(include_wgsl!("shaders/adding_in_place.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Add In Place Pipeline"),
-                module: &shader,
-                layout: Some(matrix_matrix_in_place_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("add_in_place_main"),
-            })
-        };
-
-        let add_scalar_pipeline = {
-            let shader = device.create_shader_module(include_wgsl!("shaders/adding_scalar.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Add Scalar Pipeline"),
-                module: &shader,
-                layout: Some(&matrix_scalar_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("add_scalar_main"),
-            })
-        };
-
-        let sub_pipeline = {
-            let shader = device.create_shader_module(include_wgsl!("shaders/subing.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Sub Pipeline"),
-                module: &shader,
-                layout: Some(matrix_matrix_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("sub_main"),
-            })
-        };
-
-        let sub_in_place_pipeline = {
-            let shader = device.create_shader_module(include_wgsl!("shaders/subing_in_place.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Sub In Place Pipeline"),
-                module: &shader,
-                layout: Some(matrix_matrix_in_place_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("sub_in_place_main"),
-            })
-        };
-
-        let sub_scalar_pipeline = {
-            let shader = device.create_shader_module(include_wgsl!("shaders/subing_scalar.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Sub Scalar Pipeline"),
-                module: &shader,
-                layout: Some(&matrix_scalar_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("sub_scalar_main"),
-            })
-        };
-
-        let mult_scalar_pipeline = {
-            let shader = device.create_shader_module(include_wgsl!("shaders/mult_scalar.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Mult Scalar Pipeline"),
-                module: &shader,
-                layout: Some(&matrix_scalar_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("mult_scalar_main"),
-            })
-        };
-
-        // Vectored pipelines
-        let vectored_add_pipeline = {
-            let shader = device.create_shader_module(include_wgsl!("shaders/vectored_add.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Vectored Add Pipeline"),
-                module: &shader,
-                layout: Some(&matrix_matrix_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("vectored_add_main"),
-            })
-        };
-
-        (
-            dot_pipeline,
-            add_pipeline,
-            add_in_place_pipeline,
-            add_scalar_pipeline,
-            sub_pipeline,
-            sub_in_place_pipeline,
-            sub_scalar_pipeline,
-            mult_scalar_pipeline,
-            // Vectored Pipelines
-            vectored_add_pipeline,
-        )
-    }
-
-    pub fn init(device: &Device) -> Result<Self, GpuMathNotInitializedError> {
-        // Create the readable bind group layout for the pipelines
-        let readable_bind_group_layout =
-            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                label: Some("Readable Bind Group Layout"),
-                entries: &[
-                    // Matrix Buffer
-                    BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: ShaderStages::COMPUTE,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Storage { read_only: true },
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                    // Dimensions
-                    BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: ShaderStages::COMPUTE,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                    // Transpose
-                    BindGroupLayoutEntry {
-                        binding: 2,
-                        visibility: ShaderStages::COMPUTE,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                ],
-            });
-
-        // Create the readable bind group layout with the scalar buffer too
-        let scalar_bind_group_layout =
-            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                label: Some("Scalar Readable Bind Group Layout"),
-                entries: &[
-                    // Matrix Buffer
-                    BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: ShaderStages::COMPUTE,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                ],
-            });
-
-        // Create the writable bind group layout for the pipelines
-        let writable_bind_group_layout =
-            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                label: Some("Readable Bind Group Layout"),
-                entries: &[
-                    // Matrix Buffer
-                    BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: ShaderStages::COMPUTE,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Storage { read_only: false },
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                    // Dimensions
-                    BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: ShaderStages::COMPUTE,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                    // Transpose
-                    BindGroupLayoutEntry {
-                        binding: 2,
-                        visibility: ShaderStages::COMPUTE,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                ],
-            });
-
-        // This is the pipeline layout for a Matrix Matrix operation
-        let matrix_matrix_pipeline_layout =
-            device.create_pipeline_layout(&PipelineLayoutDescriptor {
-                label: Some("Matrix Matrix Pipeline Layout"),
-                bind_group_layouts: &[
-                    &readable_bind_group_layout,
-                    &readable_bind_group_layout,
-                    &writable_bind_group_layout,
-                ],
-                push_constant_ranges: &[],
-            });
-
-        // This is the pipeline layout for a matrix scalar operation
-        let matrix_scalar_pipeline_layout =
-            device.create_pipeline_layout(&PipelineLayoutDescriptor {
-                label: Some("Matrix Pipeline Layout"),
-                bind_group_layouts: &[
-                    &readable_bind_group_layout,
-                    &scalar_bind_group_layout,
-                    &writable_bind_group_layout,
-                ],
-                push_constant_ranges: &[],
-            });
-
-        // This is the pipeline layout for matrix matrix operation in place
-        let matrix_matrix_in_place_pipeline_layout =
-            device.create_pipeline_layout(&PipelineLayoutDescriptor {
-                label: Some("Matrix Matrix In Place Pipeline Layout"),
-                bind_group_layouts: &[&writable_bind_group_layout, &readable_bind_group_layout],
-                push_constant_ranges: &[],
-            });
-
-        let (
-            dot_pipeline,
-            add_pipeline,
-            add_in_place_pipeline,
-            add_scalar_pipeline,
-            sub_pipeline,
-            sub_in_place_pipeline,
-            sub_scalar_pipeline,
-            mult_scalar_pipeline,
-            vectored_add_pipeline,
-        ) = Self::compile_pipelines(
-            device,
-            &matrix_matrix_pipeline_layout,
-            &matrix_scalar_pipeline_layout,
-            &matrix_matrix_in_place_pipeline_layout,
-        );
-
-        Ok(Self {
-            readable_bind_group_layout,
-            scalar_bind_group_layout,
-            writable_bind_group_layout,
-            matrix_matrix_pipeline_layout,
-            matrix_scalar_pipeline_layout,
-            matrix_matrix_in_place_pipeline_layout,
-            max_dimension: MIN_DIMENSION,
-            dot_pipeline,
-            add_pipeline,
-            add_in_place_pipeline,
-            add_scalar_pipeline,
-            sub_pipeline,
-            sub_in_place_pipeline,
-            sub_scalar_pipeline,
-            mult_scalar_pipeline,
-            // Vector pipelines
-            vectored_add_pipeline,
-        })
-    }
-}
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -639,6 +283,38 @@ impl Matrix {
             &matrix1.pipeline_info.add_in_place_pipeline,
             matrix1,
             matrix2
+        );
+
+        Ok(())
+    }
+
+    /// Adds the contents of `vector` to `matrix` and stores it in `destination`
+    pub fn vectored_add_in_place(matrix: &Matrix, vector: &Matrix) -> Result<(), Box<dyn Error>> {
+        // Check if the `vector` matrix is actually a vector
+        if !vector.is_vector() {
+            return Err(Box::new(MatrixAddError(
+                "Vector matrix is not a vector".to_string(),
+            )));
+        }
+
+        // Check if the vector dimensions match the matrix
+        if !(vector.rows == matrix.rows
+            || vector.cols == matrix.cols
+            || vector.rows == matrix.cols
+            || vector.cols == matrix.rows)
+        {
+            return Err(Box::new(MatrixAddError(
+                "Vector dimensions do not match Matrix".to_string(),
+            )));
+        }
+
+        matrix_matrix_2d_in_place_pipeline!(
+            &matrix.device,
+            &matrix.queue,
+            "Matrix Vectored Add In Place",
+            &matrix.pipeline_info.vectored_add_in_place_pipeline,
+            matrix,
+            vector
         );
 
         Ok(())

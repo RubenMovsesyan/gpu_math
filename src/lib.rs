@@ -12,11 +12,11 @@ mod errors;
 // Publically exposed modules
 pub mod math;
 
+use math::matrix_pipelines::MatrixPipelines;
 // Include these when the library is imported
 pub use math::*;
 
 // Library inner imports
-use matrix::MatrixPipelines;
 use pollster::FutureExt;
 use wgpu::{
     Adapter, Backends, Device, DeviceDescriptor, Features, Instance, InstanceDescriptor, Limits,
