@@ -1,3 +1,4 @@
+#![recursion_limit = "512"]
 mod gpu_utils;
 
 use std::rc::Rc;

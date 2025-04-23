@@ -10,7 +10,7 @@ use crate::{
     GpuMath,
     gpu_utils::{WORK_GROUP_SIZE_2D, compute_workgroup_size_2d, get_buffer, read_buffer},
     matrix_dot_pipline, matrix_matrix_2d_in_place_pipeline, matrix_matrix_2d_pipeline,
-    matrix_scalar_pipline,
+    matrix_scalar_in_place_pipline, matrix_scalar_pipline,
 };
 
 use super::{
@@ -556,6 +556,23 @@ impl Matrix {
             &source.pipeline_info.mult_scalar_pipeline,
             source,
             destination
+        );
+
+        Ok(())
+    }
+
+    /// Multiplies the `matrix` by the `scalar` in place
+    pub fn mult_scalar_in_place(matrix: &Matrix, scalar: f32) -> Result<(), Box<dyn Error>> {
+        matrix
+            .queue
+            .write_buffer(&matrix.scalar, 0, bytemuck::cast_slice(&[scalar]));
+
+        matrix_scalar_in_place_pipline!(
+            &matrix.device,
+            &matrix.queue,
+            "Matrix Mult Scalar In Place",
+            &matrix.pipeline_info.mult_scalar_in_place_pipeline,
+            matrix
         );
 
         Ok(())

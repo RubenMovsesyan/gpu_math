@@ -178,6 +178,45 @@ fn bench_matrix_mult_in_place_big(c: &mut Criterion) {
     });
 }
 
+fn bench_matrix_mult_scalar_in_place(c: &mut Criterion) {
+    let gpu_math = GpuMath::new();
+
+    let mat1 = Matrix::new(
+        &gpu_math,
+        (3, 3),
+        Some(vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+    )
+    .expect("Failed");
+
+    c.bench_function("mult_scalar_in_place", |b| {
+        b.iter(|| {
+            Matrix::mult_scalar_in_place(&mat1, 10.0).expect("Failed");
+        });
+    });
+}
+
+fn bench_matrix_mult_scalar_in_place_big(c: &mut Criterion) {
+    let gpu_math = GpuMath::new();
+
+    let mat1 = Matrix::new(
+        &gpu_math,
+        (1000, 1000),
+        Some(
+            (0..(1000 * 1000))
+                .into_iter()
+                .map(|v| v as f32)
+                .collect::<Vec<f32>>(),
+        ),
+    )
+    .expect("Failed");
+
+    c.bench_function("mult_scalar_in_place_big", |b| {
+        b.iter(|| {
+            Matrix::mult_scalar_in_place(&mat1, 10.0).expect("Failed");
+        });
+    });
+}
+
 criterion_group!(
     multing_benches,
     bench_matrix_mult_scalar,
@@ -185,7 +224,9 @@ criterion_group!(
     bench_matrix_mult,
     bench_matrix_mult_big,
     bench_matrix_mult_in_place,
-    bench_matrix_mult_in_place_big
+    bench_matrix_mult_in_place_big,
+    bench_matrix_mult_scalar_in_place,
+    bench_matrix_mult_scalar_in_place_big
 );
 
 criterion_main!(multing_benches);

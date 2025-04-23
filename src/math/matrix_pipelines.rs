@@ -5,7 +5,7 @@ use wgpu::{
     include_wgsl,
 };
 
-use crate::errors::GpuMathNotInitializedError;
+use crate::{create_matrix_pipelines, errors::GpuMathNotInitializedError};
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -29,6 +29,7 @@ pub struct MatrixPipelines {
     pub sub_in_place_pipeline: ComputePipeline,
     pub sub_scalar_pipeline: ComputePipeline,
     pub mult_scalar_pipeline: ComputePipeline,
+    pub mult_scalar_in_place_pipeline: ComputePipeline,
     pub mult_pipeline: ComputePipeline,
     pub mult_in_place_pipeline: ComputePipeline,
 
@@ -40,231 +41,6 @@ pub struct MatrixPipelines {
 }
 
 impl MatrixPipelines {
-    fn compile_pipelines(
-        device: &Device,
-        matrix_matrix_pipeline_layout: &PipelineLayout,
-        matrix_scalar_pipeline_layout: &PipelineLayout,
-        matrix_matrix_in_place_pipeline_layout: &PipelineLayout,
-    ) -> (
-        ComputePipeline,
-        ComputePipeline,
-        ComputePipeline,
-        ComputePipeline,
-        ComputePipeline,
-        ComputePipeline,
-        ComputePipeline,
-        ComputePipeline,
-        ComputePipeline,
-        ComputePipeline,
-        ComputePipeline,
-        ComputePipeline,
-        ComputePipeline,
-        ComputePipeline,
-    ) {
-        let dot_pipeline = {
-            let shader = device.create_shader_module(include_wgsl!("shaders/dotting.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Dot Pipeline"),
-                module: &shader,
-                layout: Some(matrix_matrix_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("dot_main"),
-            })
-        };
-
-        let add_pipeline = {
-            let shader = device.create_shader_module(include_wgsl!("shaders/adding.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Add Pipeline"),
-                module: &shader,
-                layout: Some(matrix_matrix_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("add_main"),
-            })
-        };
-
-        let add_in_place_pipeline = {
-            let shader = device.create_shader_module(include_wgsl!("shaders/adding_in_place.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Add In Place Pipeline"),
-                module: &shader,
-                layout: Some(matrix_matrix_in_place_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("add_in_place_main"),
-            })
-        };
-
-        let add_scalar_pipeline = {
-            let shader = device.create_shader_module(include_wgsl!("shaders/adding_scalar.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Add Scalar Pipeline"),
-                module: &shader,
-                layout: Some(&matrix_scalar_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("add_scalar_main"),
-            })
-        };
-
-        let sub_pipeline = {
-            let shader = device.create_shader_module(include_wgsl!("shaders/subing.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Sub Pipeline"),
-                module: &shader,
-                layout: Some(matrix_matrix_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("sub_main"),
-            })
-        };
-
-        let sub_in_place_pipeline = {
-            let shader = device.create_shader_module(include_wgsl!("shaders/subing_in_place.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Sub In Place Pipeline"),
-                module: &shader,
-                layout: Some(matrix_matrix_in_place_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("sub_in_place_main"),
-            })
-        };
-
-        let sub_scalar_pipeline = {
-            let shader = device.create_shader_module(include_wgsl!("shaders/subing_scalar.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Sub Scalar Pipeline"),
-                module: &shader,
-                layout: Some(&matrix_scalar_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("sub_scalar_main"),
-            })
-        };
-
-        let mult_scalar_pipeline = {
-            let shader = device.create_shader_module(include_wgsl!("shaders/mult_scalar.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Mult Scalar Pipeline"),
-                module: &shader,
-                layout: Some(&matrix_scalar_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("mult_scalar_main"),
-            })
-        };
-
-        let mult_pipeline = {
-            let shader = device.create_shader_module(include_wgsl!("shaders/mult.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Mult Pipeline"),
-                module: &shader,
-                layout: Some(&matrix_matrix_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("mult_main"),
-            })
-        };
-
-        let mult_in_place_pipeline = {
-            let shader = device.create_shader_module(include_wgsl!("shaders/mult_in_place.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Mult In Place Pipeline"),
-                module: &shader,
-                layout: Some(&matrix_matrix_in_place_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("mult_in_place_main"),
-            })
-        };
-
-        // Vectored pipelines
-        let vectored_add_pipeline = {
-            let shader = device.create_shader_module(include_wgsl!("shaders/vectored_add.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Vectored Add Pipeline"),
-                module: &shader,
-                layout: Some(&matrix_matrix_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("vectored_add_main"),
-            })
-        };
-
-        let vectored_add_in_place_pipeline = {
-            let shader =
-                device.create_shader_module(include_wgsl!("shaders/vectored_add_in_place.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Vectored Add In Place Pipeline"),
-                module: &shader,
-                layout: Some(&matrix_matrix_in_place_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("vectored_add_in_place_main"),
-            })
-        };
-
-        let vectored_sub_pipeline = {
-            let shader = device.create_shader_module(include_wgsl!("shaders/vectored_sub.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Vectored Sub Pipeline"),
-                module: &shader,
-                layout: Some(&matrix_matrix_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("vectored_sub_main"),
-            })
-        };
-
-        let vectored_sub_in_place_pipeline = {
-            let shader =
-                device.create_shader_module(include_wgsl!("shaders/vectored_sub_in_place.wgsl"));
-
-            device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Matrix Vectored Sub In Place Pipeline"),
-                module: &shader,
-                layout: Some(&matrix_matrix_in_place_pipeline_layout),
-                cache: None,
-                compilation_options: PipelineCompilationOptions::default(),
-                entry_point: Some("vectored_sub_in_place_main"),
-            })
-        };
-
-        (
-            dot_pipeline,
-            add_pipeline,
-            add_in_place_pipeline,
-            add_scalar_pipeline,
-            sub_pipeline,
-            sub_in_place_pipeline,
-            sub_scalar_pipeline,
-            mult_scalar_pipeline,
-            mult_pipeline,
-            mult_in_place_pipeline,
-            // Vectored Pipelines
-            vectored_add_pipeline,
-            vectored_add_in_place_pipeline,
-            vectored_sub_pipeline,
-            vectored_sub_in_place_pipeline,
-        )
-    }
-
     pub fn init(device: &Device) -> Result<Self, GpuMathNotInitializedError> {
         // Create the readable bind group layout for the pipelines
         let readable_bind_group_layout =
@@ -399,6 +175,14 @@ impl MatrixPipelines {
                 push_constant_ranges: &[],
             });
 
+        // This is the pipeline layout for a matrix scalar operation in place
+        let matrix_scalar_in_place_pipeline_layout =
+            device.create_pipeline_layout(&PipelineLayoutDescriptor {
+                label: Some("Matrix Scalar In Place Pipeline Layout"),
+                bind_group_layouts: &[&writable_bind_group_layout, &scalar_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
         let (
             dot_pipeline,
             add_pipeline,
@@ -408,18 +192,111 @@ impl MatrixPipelines {
             sub_in_place_pipeline,
             sub_scalar_pipeline,
             mult_scalar_pipeline,
+            mult_scalar_in_place_pipeline,
             mult_pipeline,
             mult_in_place_pipeline,
-            // Vector pipelines
+        ) = create_matrix_pipelines!(
+            device,
+            (
+                "shaders/dotting.wgsl",
+                "Matrix Dot Pipeline",
+                matrix_matrix_pipeline_layout,
+                "dot_main"
+            ),
+            (
+                "shaders/adding.wgsl",
+                "Matrix Add Pipeline",
+                matrix_matrix_pipeline_layout,
+                "add_main"
+            ),
+            (
+                "shaders/adding_in_place.wgsl",
+                "Matrix Add In Place Pipeline",
+                matrix_matrix_in_place_pipeline_layout,
+                "add_in_place_main"
+            ),
+            (
+                "shaders/adding_scalar.wgsl",
+                "Matrix Add Scalar Pipeline",
+                matrix_scalar_pipeline_layout,
+                "add_scalar_main"
+            ),
+            (
+                "shaders/subing.wgsl",
+                "Matrix Sub Pipeline",
+                matrix_matrix_pipeline_layout,
+                "sub_main"
+            ),
+            (
+                "shaders/subing_in_place.wgsl",
+                "Matrix Sub In Place Pipeline",
+                matrix_matrix_in_place_pipeline_layout,
+                "sub_in_place_main"
+            ),
+            (
+                "shaders/subing_scalar.wgsl",
+                "Matrix Sub Scalar Pipeline",
+                matrix_scalar_pipeline_layout,
+                "sub_scalar_main"
+            ),
+            (
+                "shaders/mult_scalar.wgsl",
+                "Matrix Mult Scalar Pipeline",
+                matrix_scalar_pipeline_layout,
+                "mult_scalar_main"
+            ),
+            (
+                "shaders/mult_scalar_in_place.wgsl",
+                "Matrix Mult Scalar In Place Pipeline",
+                matrix_scalar_in_place_pipeline_layout,
+                "mult_scalar_in_place_main"
+            ),
+            (
+                "shaders/mult.wgsl",
+                "Matrix Mult Pipeline",
+                matrix_matrix_pipeline_layout,
+                "mult_main"
+            ),
+            (
+                "shaders/mult_in_place.wgsl",
+                "Matrix Mult In Place Pipeline",
+                matrix_matrix_in_place_pipeline_layout,
+                "mult_in_place_main"
+            )
+        );
+
+        // Vector pipelines
+        let (
             vectored_add_pipeline,
             vectored_add_in_place_pipeline,
             vectored_sub_pipeline,
             vectored_sub_in_place_pipeline,
-        ) = Self::compile_pipelines(
+        ) = create_matrix_pipelines!(
             device,
-            &matrix_matrix_pipeline_layout,
-            &matrix_scalar_pipeline_layout,
-            &matrix_matrix_in_place_pipeline_layout,
+            (
+                "shaders/vectored_add.wgsl",
+                "Matrix Vectored Add Pipeline",
+                matrix_matrix_pipeline_layout,
+                "vectored_add_main"
+            ),
+            (
+                "shaders/vectored_add_in_place.wgsl",
+                "Matrix Vectored Add In Place Pipeline",
+                matrix_matrix_in_place_pipeline_layout,
+                "vectored_add_in_place_main"
+            ),
+            (
+                "shaders/vectored_sub.wgsl",
+                "Matrix Vectored Sub Pipeline",
+                matrix_matrix_pipeline_layout,
+                "vectored_sub_main"
+            ),
+            (
+                "shaders/vectored_sub_in_place.wgsl",
+                "Matrix Vectored Sub In Place Pipeline",
+                matrix_matrix_in_place_pipeline_layout,
+                "vectored_sub_in_place_main"
+            )
         );
 
         Ok(Self {
@@ -437,6 +314,7 @@ impl MatrixPipelines {
             sub_in_place_pipeline,
             sub_scalar_pipeline,
             mult_scalar_pipeline,
+            mult_scalar_in_place_pipeline,
             mult_pipeline,
             mult_in_place_pipeline,
             // Vector pipelines
