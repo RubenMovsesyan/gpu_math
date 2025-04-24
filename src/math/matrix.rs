@@ -9,6 +9,7 @@ use wgpu::{
 use crate::{
     GpuMath,
     gpu_utils::{WORK_GROUP_SIZE_2D, compute_workgroup_size_2d, get_buffer, read_buffer},
+    math_errors::MatrixExpError,
     matrix_dot_pipline, matrix_matrix_2d_in_place_pipeline, matrix_matrix_2d_pipeline,
     matrix_scalar_in_place_pipline, matrix_scalar_pipline,
 };
@@ -634,6 +635,45 @@ impl Matrix {
             &matrix1.pipeline_info.mult_in_place_pipeline,
             matrix1,
             matrix2
+        );
+
+        Ok(())
+    }
+
+    /// Exponents the `matrix` and stores it in `destination`
+    pub fn exp(matrix: &Matrix, destination: &Matrix) -> Result<(), Box<dyn Error>> {
+        // Make sure that the rows and columns of both matrices match
+        if matrix.cols != destination.cols {
+            return Err(Box::new(MatrixExpError(
+                "Matrix cols do not match Destination cols".to_string(),
+            )));
+        }
+
+        if matrix.rows != destination.rows {
+            return Err(Box::new(MatrixExpError(
+                "Matrix rows do not match Destination rows".to_string(),
+            )));
+        }
+
+        matrix_scalar_pipline!(
+            &destination.device,
+            &destination.queue,
+            "Matrix Exp",
+            &matrix.pipeline_info.exp_pipeline,
+            matrix,
+            destination
+        );
+
+        Ok(())
+    }
+
+    pub fn exp_in_place(matrix: &Matrix) -> Result<(), Box<dyn Error>> {
+        matrix_scalar_in_place_pipline!(
+            &matrix.device,
+            &matrix.queue,
+            "Matrix Exp In Place",
+            &matrix.pipeline_info.exp_in_place_pipeline,
+            matrix
         );
 
         Ok(())

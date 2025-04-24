@@ -32,6 +32,8 @@ pub struct MatrixPipelines {
     pub mult_scalar_in_place_pipeline: ComputePipeline,
     pub mult_pipeline: ComputePipeline,
     pub mult_in_place_pipeline: ComputePipeline,
+    pub exp_pipeline: ComputePipeline,
+    pub exp_in_place_pipeline: ComputePipeline,
 
     // Vectored Pipelines
     pub vectored_add_pipeline: ComputePipeline,
@@ -299,6 +301,23 @@ impl MatrixPipelines {
             )
         );
 
+        // Extra pipelines
+        let (exp_pipeline, exp_in_place_pipeline) = create_matrix_pipelines!(
+            device,
+            (
+                "shaders/exp.wgsl",
+                "Matrix Exp Pipeline",
+                matrix_scalar_pipeline_layout,
+                "exp_main"
+            ),
+            (
+                "shaders/exp_in_place.wgsl",
+                "Matrix Exp In Place",
+                matrix_scalar_in_place_pipeline_layout,
+                "exp_in_place_main"
+            )
+        );
+
         Ok(Self {
             readable_bind_group_layout,
             scalar_bind_group_layout,
@@ -317,6 +336,8 @@ impl MatrixPipelines {
             mult_scalar_in_place_pipeline,
             mult_pipeline,
             mult_in_place_pipeline,
+            exp_pipeline,
+            exp_in_place_pipeline,
             // Vector pipelines
             vectored_add_pipeline,
             vectored_add_in_place_pipeline,

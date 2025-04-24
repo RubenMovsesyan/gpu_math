@@ -29,3 +29,7 @@ harness = false
 [[bench]]
 name = "matrix_dotting_benches"
 harness = false
+
+[[bench]]
+name = "matrix_special_benches"
+harness = false
