@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod tests {
+mod special_tests {
     use gpu_math::{GpuMath, matrix::Matrix};
 
     #[test]
@@ -54,5 +54,49 @@ mod tests {
         Matrix::exp_in_place(&mat).expect("Failed");
 
         assert_eq!(mat, expected);
+    }
+
+    #[test]
+    fn test_matrix_sum() {
+        let gpu_math = GpuMath::new();
+
+        const ROWS: u32 = 16;
+        const COLS: u32 = 32;
+
+        let vec = (0..(ROWS * COLS))
+            .into_iter()
+            .map(|v| v as f32)
+            .collect::<Vec<f32>>();
+
+        let mat = Matrix::new(&gpu_math, (ROWS, COLS), Some(vec.clone())).expect("Failed");
+
+        let expected: f32 = vec.iter().sum();
+
+        let sum = Matrix::sum(&mat).expect("Failed");
+
+        assert_eq!(sum, expected);
+    }
+
+    #[test]
+    fn test_matrix_sum_big() {
+        let gpu_math = GpuMath::new();
+
+        let mat = Matrix::new(
+            &gpu_math,
+            (1000, 1000),
+            Some(
+                (0..(1000 * 1000))
+                    .into_iter()
+                    .map(|v| v as f32)
+                    .collect::<Vec<f32>>(),
+            ),
+        )
+        .expect("Failed");
+
+        let expected: f32 = (0..(1000 * 1000)).into_iter().map(|v| v as f32).sum();
+
+        let sum = Matrix::sum(&mat).expect("Failed");
+
+        assert_eq!(sum, expected);
     }
 }

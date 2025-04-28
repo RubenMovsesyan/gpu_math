@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod tests {
+mod dotting_tests {
     use gpu_math::{GpuMath, matrix::Matrix};
 
     #[test]

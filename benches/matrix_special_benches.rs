@@ -37,6 +37,54 @@ fn bench_matrix_exp_in_place(c: &mut Criterion) {
     });
 }
 
-criterion_group!(special_benches, bench_matrix_exp, bench_matrix_exp_in_place);
+fn bench_matrix_sum(c: &mut Criterion) {
+    let gpu_math = GpuMath::new();
+
+    const ROWS: u32 = 16;
+    const COLS: u32 = 32;
+
+    let vec = (0..(ROWS * COLS))
+        .into_iter()
+        .map(|v| v as f32)
+        .collect::<Vec<f32>>();
+
+    let mat = Matrix::new(&gpu_math, (ROWS, COLS), Some(vec.clone())).expect("Failed");
+
+    c.bench_function("sum", |b| {
+        b.iter(|| {
+            let _sum = Matrix::sum(&mat).expect("Failed");
+        });
+    });
+}
+
+fn bench_matrix_sum_big(c: &mut Criterion) {
+    let gpu_math = GpuMath::new();
+
+    let mat = Matrix::new(
+        &gpu_math,
+        (1000, 1000),
+        Some(
+            (0..(1000 * 1000))
+                .into_iter()
+                .map(|v| v as f32)
+                .collect::<Vec<f32>>(),
+        ),
+    )
+    .expect("Failed");
+
+    c.bench_function("sum_big", |b| {
+        b.iter(|| {
+            let _sum = Matrix::sum(&mat).expect("Failed");
+        });
+    });
+}
+
+criterion_group!(
+    special_benches,
+    bench_matrix_exp,
+    bench_matrix_exp_in_place,
+    bench_matrix_sum,
+    bench_matrix_sum_big
+);
 
 criterion_main!(special_benches);

@@ -1,9 +1,9 @@
 #[cfg(test)]
-mod tests {
+mod subbing_tests {
     use gpu_math::{GpuMath, matrix::Matrix};
 
     #[test]
-    fn test_matrix_adding() {
+    fn test_matrix_subing() {
         let gpu_math = GpuMath::new();
 
         let mat1 = Matrix::new(
@@ -24,97 +24,17 @@ mod tests {
         let expected = Matrix::new(
             &gpu_math,
             (3, 3),
-            Some(vec![0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0]),
+            Some(vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
         )
         .expect("Failed");
 
-        Matrix::add(&mat1, &mat2, &dest).expect("Failed");
+        Matrix::sub(&mat1, &mat2, &dest).expect("Failed");
 
         assert_eq!(dest, expected);
     }
 
     #[test]
-    fn test_matrix_adding_in_place() {
-        let gpu_math = GpuMath::new();
-
-        let mat1 = Matrix::new(
-            &gpu_math,
-            (3, 3),
-            Some((0..9).into_iter().map(|v| v as f32).collect::<Vec<f32>>()),
-        )
-        .expect("Failed");
-
-        let mat2 = Matrix::new(
-            &gpu_math,
-            (3, 3),
-            Some((0..9).into_iter().map(|v| v as f32).collect::<Vec<f32>>()),
-        )
-        .expect("Failed");
-
-        let expected = Matrix::new(
-            &gpu_math,
-            (3, 3),
-            Some(
-                (0..9)
-                    .into_iter()
-                    .map(|v| (v * 2) as f32)
-                    .collect::<Vec<f32>>(),
-            ),
-        )
-        .expect("Failed");
-
-        Matrix::add_in_place(&mat1, &mat2).expect("Failed");
-
-        assert_eq!(mat1, expected);
-    }
-
-    #[test]
-    fn test_matrix_adding_in_place_big() {
-        let gpu_math = GpuMath::new();
-
-        let mat1 = Matrix::new(
-            &gpu_math,
-            (1000, 1000),
-            Some(
-                (0..(1000 * 1000))
-                    .into_iter()
-                    .map(|v| v as f32)
-                    .collect::<Vec<f32>>(),
-            ),
-        )
-        .expect("Failed");
-
-        let mat2 = Matrix::new(
-            &gpu_math,
-            (1000, 1000),
-            Some(
-                (0..(1000 * 1000))
-                    .into_iter()
-                    .map(|v| v as f32)
-                    .collect::<Vec<f32>>(),
-            ),
-        )
-        .expect("Failed");
-
-        let expected = Matrix::new(
-            &gpu_math,
-            (1000, 1000),
-            Some(
-                (0..(1000 * 1000))
-                    .into_iter()
-                    .map(|v| (v * 2) as f32)
-                    .collect::<Vec<f32>>(),
-            ),
-        )
-        .expect("Failed");
-
-        Matrix::add_in_place(&mat1, &mat2).expect("Failed");
-
-        assert_eq!(mat1, expected);
-    }
-
-    #[test]
-    fn test_matrix_adding_big() {
+    fn test_matrix_subing_big() {
         let gpu_math = GpuMath::new();
 
         let mat1 = Matrix::new(
@@ -164,12 +84,7 @@ mod tests {
                 let mut output = Vec::new();
 
                 for _ in 0..1000 {
-                    output.push(
-                        (0..1000)
-                            .into_iter()
-                            .map(|i| (i + i) as f32)
-                            .collect::<Vec<f32>>(),
-                    );
+                    output.push((0..1000).into_iter().map(|_| 0.0).collect::<Vec<f32>>());
                 }
 
                 output.into_iter().flatten().collect::<Vec<f32>>()
@@ -179,13 +94,88 @@ mod tests {
 
         let dest = Matrix::new(&gpu_math, (1000, 1000), None).expect("Failed");
 
-        Matrix::add(&mat1, &mat2, &dest).expect("Failed");
+        Matrix::sub(&mat1, &mat2, &dest).expect("Failed");
 
         assert_eq!(dest, expected);
     }
 
     #[test]
-    fn test_matrix_adding_scalar() {
+    fn test_matrix_subing_in_place() {
+        let gpu_math = GpuMath::new();
+
+        let mat1 = Matrix::new(
+            &gpu_math,
+            (3, 3),
+            Some((0..9).into_iter().map(|v| v as f32).collect::<Vec<f32>>()),
+        )
+        .expect("Failed");
+
+        let mat2 = Matrix::new(
+            &gpu_math,
+            (3, 3),
+            Some((0..9).into_iter().map(|v| v as f32).collect::<Vec<f32>>()),
+        )
+        .expect("Failed");
+
+        let expected = Matrix::new(
+            &gpu_math,
+            (3, 3),
+            Some((0..9).into_iter().map(|_| 0.0).collect::<Vec<f32>>()),
+        )
+        .expect("Failed");
+
+        Matrix::sub_in_place(&mat1, &mat2).expect("Failed");
+
+        assert_eq!(mat1, expected);
+    }
+
+    #[test]
+    fn test_matrix_subing_in_place_big() {
+        let gpu_math = GpuMath::new();
+
+        let mat1 = Matrix::new(
+            &gpu_math,
+            (1000, 1000),
+            Some(
+                (0..(1000 * 1000))
+                    .into_iter()
+                    .map(|v| v as f32)
+                    .collect::<Vec<f32>>(),
+            ),
+        )
+        .expect("Failed");
+
+        let mat2 = Matrix::new(
+            &gpu_math,
+            (1000, 1000),
+            Some(
+                (0..(1000 * 1000))
+                    .into_iter()
+                    .map(|v| v as f32)
+                    .collect::<Vec<f32>>(),
+            ),
+        )
+        .expect("Failed");
+
+        let expected = Matrix::new(
+            &gpu_math,
+            (1000, 1000),
+            Some(
+                (0..(1000 * 1000))
+                    .into_iter()
+                    .map(|_| 0.0)
+                    .collect::<Vec<f32>>(),
+            ),
+        )
+        .expect("Failed");
+
+        Matrix::sub_in_place(&mat1, &mat2).expect("Failed");
+
+        assert_eq!(mat1, expected);
+    }
+
+    #[test]
+    fn test_matrix_subing_scalar() {
         let gpu_math = GpuMath::new();
 
         let mat1 = Matrix::new(
@@ -199,17 +189,17 @@ mod tests {
         let expected = Matrix::new(
             &gpu_math,
             (3, 3),
-            Some(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]),
+            Some(vec![-1.0, 0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]),
         )
         .expect("Failed");
 
-        Matrix::add_scalar(&mat1, 1.0, &dest).expect("Failed");
+        Matrix::sub_scalar(&mat1, 1.0, &dest).expect("Failed");
 
         assert_eq!(dest, expected);
     }
 
     #[test]
-    fn test_matrix_adding_scalar_big() {
+    fn test_matrix_subing_scalar_big() {
         let gpu_math = GpuMath::new();
 
         let mat1 = Matrix::new(
@@ -231,19 +221,19 @@ mod tests {
             Some(
                 (0..(1000 * 1000))
                     .into_iter()
-                    .map(|v| (v + 1) as f32)
+                    .map(|v| (v - 1) as f32)
                     .collect::<Vec<f32>>(),
             ),
         )
         .expect("Failed");
 
-        Matrix::add_scalar(&mat1, 1.0, &dest).expect("Failed");
+        Matrix::sub_scalar(&mat1, 1.0, &dest).expect("Failed");
 
         assert_eq!(dest, expected);
     }
 
     #[test]
-    fn test_matrix_vectored_add() {
+    fn test_matrix_vectored_sub() {
         let gpu_math = GpuMath::new();
 
         const ROWS: u32 = 16;
@@ -287,8 +277,8 @@ mod tests {
                 let mut out = Vec::with_capacity((ROWS * COLS) as usize);
 
                 for _ in 0..ROWS {
-                    for i in 0..COLS {
-                        out.push((2 * i) as f32);
+                    for _ in 0..COLS {
+                        out.push(0.0);
                     }
                 }
 
@@ -297,13 +287,13 @@ mod tests {
         )
         .expect("Failed");
 
-        Matrix::vectored_add(&mat, &vec, &dest).expect("Failed");
+        Matrix::vectored_sub(&mat, &vec, &dest).expect("Failed");
 
         assert_eq!(dest, expected);
     }
 
     #[test]
-    fn test_matrix_vectored_add_big() {
+    fn test_matrix_vectored_sub_big() {
         let gpu_math = GpuMath::new();
 
         let mat = Matrix::new(
@@ -339,8 +329,8 @@ mod tests {
                 let mut out = Vec::with_capacity(1000 * 900);
 
                 for _ in 0..1000 {
-                    for i in 0..900 {
-                        out.push((2 * i) as f32);
+                    for _ in 0..900 {
+                        out.push(0.0);
                     }
                 }
 
@@ -349,13 +339,13 @@ mod tests {
         )
         .expect("Failed");
 
-        Matrix::vectored_add(&mat, &vec, &dest).expect("Failed");
+        Matrix::vectored_sub(&mat, &vec, &dest).expect("Failed");
 
         assert_eq!(dest, expected);
     }
 
     #[test]
-    fn test_matrix_vectored_add_in_place() {
+    fn test_matrix_vectored_sub_in_place() {
         let gpu_math = GpuMath::new();
 
         const ROWS: u32 = 16;
@@ -397,8 +387,8 @@ mod tests {
                 let mut out = Vec::with_capacity((ROWS * COLS) as usize);
 
                 for _ in 0..ROWS {
-                    for i in 0..COLS {
-                        out.push((2 * i) as f32);
+                    for _ in 0..COLS {
+                        out.push(0.0);
                     }
                 }
 
@@ -407,13 +397,13 @@ mod tests {
         )
         .expect("Failed");
 
-        Matrix::vectored_add_in_place(&mat, &vec).expect("Failed");
+        Matrix::vectored_sub_in_place(&mat, &vec).expect("Failed");
 
         assert_eq!(mat, expected);
     }
 
     #[test]
-    fn test_matrix_vectored_add_in_place_big() {
+    fn test_matrix_vectored_sub_in_place_big() {
         let gpu_math = GpuMath::new();
 
         let mat = Matrix::new(
@@ -447,8 +437,8 @@ mod tests {
                 let mut out = Vec::with_capacity(1000 * 900);
 
                 for _ in 0..1000 {
-                    for i in 0..900 {
-                        out.push((2 * i) as f32);
+                    for _ in 0..900 {
+                        out.push(0.0);
                     }
                 }
 
@@ -457,7 +447,7 @@ mod tests {
         )
         .expect("Failed");
 
-        Matrix::vectored_add_in_place(&mat, &vec).expect("Failed");
+        Matrix::vectored_sub_in_place(&mat, &vec).expect("Failed");
 
         assert_eq!(mat, expected);
     }

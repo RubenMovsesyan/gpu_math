@@ -8,10 +8,13 @@ use wgpu::{
 
 use crate::{
     GpuMath,
-    gpu_utils::{WORK_GROUP_SIZE_2D, compute_workgroup_size_2d, get_buffer, read_buffer},
+    gpu_utils::{
+        WORK_GROUP_SIZE, WORK_GROUP_SIZE_2D, compute_workgroup_size, compute_workgroup_size_2d,
+        get_buffer, read_buffer,
+    },
     math_errors::MatrixExpError,
     matrix_dot_pipline, matrix_matrix_2d_in_place_pipeline, matrix_matrix_2d_pipeline,
-    matrix_scalar_in_place_pipline, matrix_scalar_pipline,
+    matrix_scalar_in_place_pipline, matrix_scalar_pipline, matrix_sum_pipeline,
 };
 
 use super::{
@@ -36,11 +39,13 @@ pub struct Matrix {
     data: Buffer,
     transpose: Buffer,
     scalar: Buffer,
+    sum: Buffer,
 
     // Bind Groups
     readable_bind_group: BindGroup,
     writable_bind_group: BindGroup,
     scalar_bind_group: BindGroup,
+    sum_bind_group: BindGroup,
 }
 
 impl Matrix {
@@ -82,10 +87,16 @@ impl Matrix {
         });
 
         let scalar = device.create_buffer(&BufferDescriptor {
-            label: Some("Matrix Scalar"),
+            label: Some("Matrix Scalar Buffer"),
             mapped_at_creation: false,
             size: DATA_SIZE,
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+        });
+
+        let sum = device.create_buffer_init(&BufferInitDescriptor {
+            label: Some("Matrix Sum Buffer"),
+            contents: bytemuck::cast_slice(&[0f32]),
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
         });
 
         let readable_bind_group = device.create_bind_group(&BindGroupDescriptor {
@@ -122,6 +133,18 @@ impl Matrix {
             ],
         });
 
+        let sum_bind_group = device.create_bind_group(&BindGroupDescriptor {
+            label: Some("Matrix Sum Bind Group"),
+            layout: &pipeline_info.sum_bind_group_layout,
+            entries: &[
+                // Sub Buffer
+                BindGroupEntry {
+                    binding: 0,
+                    resource: sum.as_entire_binding(),
+                },
+            ],
+        });
+
         let writable_bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: Some("Matrix Writable Bind Group"),
             layout: &pipeline_info.writable_bind_group_layout,
@@ -154,9 +177,11 @@ impl Matrix {
             data: buffer,
             scalar,
             transpose,
+            sum,
             readable_bind_group,
             writable_bind_group,
             scalar_bind_group,
+            sum_bind_group,
         })
     }
 
@@ -677,6 +702,26 @@ impl Matrix {
         );
 
         Ok(())
+    }
+
+    pub fn sum(matrix: &Matrix) -> Result<f32, Box<dyn Error>> {
+        #[allow(unused_assignments)]
+        let mut sum = 0.0;
+
+        matrix
+            .queue
+            .write_buffer(&matrix.sum, 0, bytemuck::cast_slice(&[0f32]));
+
+        matrix_sum_pipeline!(
+            &matrix.device,
+            &matrix.queue,
+            "Matrix Sum Pipeline",
+            &matrix.pipeline_info.sum_pipeline,
+            matrix,
+            sum
+        );
+
+        Ok(sum)
     }
 }
 

@@ -171,7 +171,7 @@ macro_rules! matrix_scalar_in_place_pipline {
 macro_rules! matrix_dot_pipline {
     ($device:expr, $queue:expr, $label:expr, $pipeline:expr, $source1:expr, $source2:expr, $destination:expr) => {
         let mut encoder = $device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("Matrix Dot Command Encdoer"),
+            label: Some("Matrix Dot Command Encoder"),
         });
 
         {
@@ -211,6 +211,41 @@ macro_rules! matrix_dot_pipline {
         }
 
         $queue.submit(Some(encoder.finish()));
+    };
+}
+
+#[macro_export]
+macro_rules! matrix_sum_pipeline {
+    ($device:expr, $queue:expr, $label:expr, $pipeline:expr, $source:expr, $output:expr) => {
+        let mut encoder = $device.create_command_encoder(&CommandEncoderDescriptor {
+            label: Some("Matrix Sum Command Encoder"),
+        });
+
+        {
+            // Get the workgroup size
+            let dispatch_size =
+                compute_workgroup_size(($source.rows * $source.cols), WORK_GROUP_SIZE);
+
+            // Begin the compute pass
+            let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor {
+                label: Some(&format!("{} Compute Pass", $label)),
+                timestamp_writes: None,
+            });
+
+            // Set the pipeline
+            compute_pass.set_pipeline($pipeline);
+
+            // Set the bind groups
+            compute_pass.set_bind_group(0, &$source.readable_bind_group, &[]);
+            compute_pass.set_bind_group(1, &$source.sum_bind_group, &[]);
+
+            compute_pass.dispatch_workgroups(dispatch_size, 1, 1);
+        }
+
+        let value = read_buffer(&$source.sum, DATA_SIZE, $device, &mut encoder);
+        $queue.submit(Some(encoder.finish()));
+
+        $output = get_buffer(&value, $device)[0];
     };
 }
 

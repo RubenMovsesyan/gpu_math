@@ -13,11 +13,13 @@ pub struct MatrixPipelines {
     // Bind Group Layouts
     pub readable_bind_group_layout: BindGroupLayout,
     pub scalar_bind_group_layout: BindGroupLayout,
+    pub sum_bind_group_layout: BindGroupLayout,
     pub writable_bind_group_layout: BindGroupLayout,
 
     // Pipeline Layouts
     matrix_matrix_pipeline_layout: PipelineLayout,
     matrix_scalar_pipeline_layout: PipelineLayout,
+    matrix_sum_pipeline_layout: PipelineLayout,
     matrix_matrix_in_place_pipeline_layout: PipelineLayout,
 
     // Pipelines
@@ -34,6 +36,7 @@ pub struct MatrixPipelines {
     pub mult_in_place_pipeline: ComputePipeline,
     pub exp_pipeline: ComputePipeline,
     pub exp_in_place_pipeline: ComputePipeline,
+    pub sum_pipeline: ComputePipeline,
 
     // Vectored Pipelines
     pub vectored_add_pipeline: ComputePipeline,
@@ -90,7 +93,7 @@ impl MatrixPipelines {
             device.create_bind_group_layout(&BindGroupLayoutDescriptor {
                 label: Some("Scalar Readable Bind Group Layout"),
                 entries: &[
-                    // Matrix Buffer
+                    // Scalar Buffer
                     BindGroupLayoutEntry {
                         binding: 0,
                         visibility: ShaderStages::COMPUTE,
@@ -103,6 +106,24 @@ impl MatrixPipelines {
                     },
                 ],
             });
+
+        // Create the writable bind group layout with the sum buffer
+        let sum_bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: Some("Sum Writable Bind Group Layout"),
+            entries: &[
+                // Sum Buffer
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::COMPUTE,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+        });
 
         // Create the writable bind group layout for the pipelines
         let writable_bind_group_layout =
@@ -160,7 +181,7 @@ impl MatrixPipelines {
         // This is the pipeline layout for a matrix scalar operation
         let matrix_scalar_pipeline_layout =
             device.create_pipeline_layout(&PipelineLayoutDescriptor {
-                label: Some("Matrix Pipeline Layout"),
+                label: Some("Matrix Scalar Pipeline Layout"),
                 bind_group_layouts: &[
                     &readable_bind_group_layout,
                     &scalar_bind_group_layout,
@@ -168,6 +189,13 @@ impl MatrixPipelines {
                 ],
                 push_constant_ranges: &[],
             });
+
+        // This is the pipeline layout for a matrix sum operation
+        let matrix_sum_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
+            label: Some("Maitrx Sum Pipeline Layout"),
+            bind_group_layouts: &[&readable_bind_group_layout, &sum_bind_group_layout],
+            push_constant_ranges: &[],
+        });
 
         // This is the pipeline layout for matrix matrix operation in place
         let matrix_matrix_in_place_pipeline_layout =
@@ -302,7 +330,7 @@ impl MatrixPipelines {
         );
 
         // Extra pipelines
-        let (exp_pipeline, exp_in_place_pipeline) = create_matrix_pipelines!(
+        let (exp_pipeline, exp_in_place_pipeline, sum_pipeline) = create_matrix_pipelines!(
             device,
             (
                 "shaders/exp.wgsl",
@@ -312,18 +340,26 @@ impl MatrixPipelines {
             ),
             (
                 "shaders/exp_in_place.wgsl",
-                "Matrix Exp In Place",
+                "Matrix Exp In Place Pipeline",
                 matrix_scalar_in_place_pipeline_layout,
                 "exp_in_place_main"
+            ),
+            (
+                "shaders/sum.wgsl",
+                "Matrix Sum Pipeline",
+                matrix_sum_pipeline_layout,
+                "sum_main"
             )
         );
 
         Ok(Self {
             readable_bind_group_layout,
             scalar_bind_group_layout,
+            sum_bind_group_layout,
             writable_bind_group_layout,
             matrix_matrix_pipeline_layout,
             matrix_scalar_pipeline_layout,
+            matrix_sum_pipeline_layout,
             matrix_matrix_in_place_pipeline_layout,
             dot_pipeline,
             add_pipeline,
@@ -338,6 +374,7 @@ impl MatrixPipelines {
             mult_in_place_pipeline,
             exp_pipeline,
             exp_in_place_pipeline,
+            sum_pipeline,
             // Vector pipelines
             vectored_add_pipeline,
             vectored_add_in_place_pipeline,
