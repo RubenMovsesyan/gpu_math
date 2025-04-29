@@ -48,6 +48,80 @@ mod dotting_tests {
     }
 
     #[test]
+    fn test_matrix_dotting_transpose() {
+        let gpu_math = GpuMath::new();
+
+        let mat1 = Matrix::new(
+            &gpu_math,
+            (3, 3),
+            Some((0..9).into_iter().map(|v| v as f32).collect::<Vec<f32>>()),
+        )
+        .expect("Failed");
+
+        let mut mat2 = Matrix::new(
+            &gpu_math,
+            (3, 3),
+            Some((0..9).into_iter().map(|v| v as f32).collect::<Vec<f32>>()),
+        )
+        .expect("Failed");
+
+        mat2.transpose().expect("Failed");
+
+        let dest = Matrix::new(&gpu_math, (3, 3), None).expect("Failed");
+
+        Matrix::dot(&mat1, &mat2, &dest).expect("Failed");
+
+        let expected = Matrix::new(
+            &gpu_math,
+            (3, 3),
+            Some(vec![5.0, 14.0, 23.0, 14.0, 50.0, 86.0, 23.0, 86.0, 149.0]),
+        )
+        .expect("Failed");
+
+        assert_eq!(dest, expected);
+    }
+
+    #[test]
+    fn test_matrix_dotting_transpose_big() {
+        let gpu_math = GpuMath::new();
+
+        const ROWS: u32 = 32;
+        const COLS: u32 = 32;
+
+        let mat1 = Matrix::new(
+            &gpu_math,
+            (ROWS, COLS),
+            Some(
+                (0..(ROWS * COLS))
+                    .into_iter()
+                    .map(|v| v as f32)
+                    .collect::<Vec<f32>>(),
+            ),
+        )
+        .expect("Failed");
+
+        let mut mat2 = Matrix::new(
+            &gpu_math,
+            (ROWS, COLS),
+            Some(
+                (0..(ROWS * COLS))
+                    .into_iter()
+                    .map(|v| v as f32)
+                    .collect::<Vec<f32>>(),
+            ),
+        )
+        .expect("Failed");
+
+        mat2.transpose().expect("Failed");
+
+        let dest = Matrix::new(&gpu_math, (ROWS, COLS), None).expect("Failed");
+
+        Matrix::dot(&mat1, &mat2, &dest).expect("Failed");
+
+        println!("{}", dest);
+    }
+
+    #[test]
     fn test_matrix_dotting_big() {
         let gpu_math = GpuMath::new();
 

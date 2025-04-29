@@ -1,8 +1,10 @@
+use std::borrow::Cow;
+
 use wgpu::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
     BufferBindingType, ComputePipeline, ComputePipelineDescriptor, Device,
-    PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor, ShaderStages,
-    include_wgsl,
+    PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor, ShaderModuleDescriptor,
+    ShaderSource, ShaderStages, include_wgsl,
 };
 
 use crate::{create_matrix_pipelines, errors::GpuMathNotInitializedError};
@@ -21,6 +23,8 @@ pub struct MatrixPipelines {
     matrix_scalar_pipeline_layout: PipelineLayout,
     matrix_sum_pipeline_layout: PipelineLayout,
     matrix_matrix_in_place_pipeline_layout: PipelineLayout,
+    // Custom Layouts
+    matrix_in_place_pipeline_layout: PipelineLayout,
 
     // Pipelines
     pub dot_pipeline: ComputePipeline,
@@ -43,6 +47,9 @@ pub struct MatrixPipelines {
     pub vectored_add_in_place_pipeline: ComputePipeline,
     pub vectored_sub_pipeline: ComputePipeline,
     pub vectored_sub_in_place_pipeline: ComputePipeline,
+
+    // Custom pipelines
+    pub custom_pipelines: Vec<ComputePipeline>,
 }
 
 impl MatrixPipelines {
@@ -213,6 +220,14 @@ impl MatrixPipelines {
                 push_constant_ranges: &[],
             });
 
+        // Pipeline layouts for custom pipelines
+        let matrix_in_place_pipeline_layout =
+            device.create_pipeline_layout(&PipelineLayoutDescriptor {
+                label: Some("Maitrx in Place Pipeline Layout"),
+                bind_group_layouts: &[&writable_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
         let (
             dot_pipeline,
             add_pipeline,
@@ -361,6 +376,7 @@ impl MatrixPipelines {
             matrix_scalar_pipeline_layout,
             matrix_sum_pipeline_layout,
             matrix_matrix_in_place_pipeline_layout,
+            matrix_in_place_pipeline_layout,
             dot_pipeline,
             add_pipeline,
             add_in_place_pipeline,
@@ -380,6 +396,31 @@ impl MatrixPipelines {
             vectored_add_in_place_pipeline,
             vectored_sub_pipeline,
             vectored_sub_in_place_pipeline,
+            // Custom pipelines
+            custom_pipelines: Vec::new(),
         })
+    }
+
+    /// Creates a custom in place pipeline from the shader and returns the index of that pipeline
+    pub fn create_custom_in_place_pipeline(&mut self, device: &Device, shader: &str) -> usize {
+        let index = self.custom_pipelines.len();
+
+        self.custom_pipelines.push({
+            let pipeline_shader = device.create_shader_module(ShaderModuleDescriptor {
+                label: Some("Custom Pipeline Shader"),
+                source: ShaderSource::Wgsl(Cow::Borrowed(shader)),
+            });
+
+            device.create_compute_pipeline(&ComputePipelineDescriptor {
+                label: Some("Custome Compute Pipeline"),
+                layout: Some(&self.matrix_in_place_pipeline_layout),
+                cache: None,
+                compilation_options: PipelineCompilationOptions::default(),
+                entry_point: Some("op_main"),
+                module: &pipeline_shader,
+            })
+        });
+
+        index
     }
 }

@@ -93,8 +93,22 @@ fn load_into_shared_mem(a_location: vec2<u32>, b_location: vec2<u32>, workgroup_
     let b_rows = b_dimensions.x;
     let b_cols = b_dimensions.y;
 
-    let a_index = a_row * a_cols + a_col;
-    let b_index = b_row * b_cols + b_col;
+    // let a_index = a_row * a_cols + a_col;
+    var a_index: u32 = 0;
+    var b_index: u32 = 0;
+
+    if (a_transpose == 1) {
+        a_index = a_row + a_rows * a_col;
+    } else {
+        a_index = a_row * a_cols + a_col;
+    }
+
+    if (b_transpose == 1) {
+        b_index = b_row + b_rows * b_col;
+    } else {
+        b_index = b_row * b_cols + b_col;
+    }
+    // let b_index = b_row * b_cols + b_col;
 
     if (a_row < a_rows && a_col < a_cols) {
         mat_a_window[wg_row][wg_col] = matrix_a[a_index];
@@ -116,6 +130,7 @@ fn sum_workgroup_matrices(output_location: vec2<u32>, limit: u32, workgroup_id: 
     let row = output_location.x;
     let col = output_location.y;
 
+    let output_rows = output_dimensions.x;
     let output_cols = output_dimensions.y;
 
     var sum = 0.0;
@@ -123,7 +138,14 @@ fn sum_workgroup_matrices(output_location: vec2<u32>, limit: u32, workgroup_id: 
         sum += mat_a_window[wg_row][k] * mat_b_window[k][wg_col + 1];
     }
 
-    let output_index = row * output_cols + col;
+    var output_index: u32 = 0;
+
+    if (x_transpose == 1) {
+        output_index = row + output_rows * col;
+    } else {
+        output_index = row * output_cols + col;
+    }
+
     atomic_add_f32(output_index, sum);
 }
 

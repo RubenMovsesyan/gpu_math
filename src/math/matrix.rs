@@ -83,7 +83,7 @@ impl Matrix {
         let transpose = device.create_buffer_init(&BufferInitDescriptor {
             label: Some("Matrix Transpose Buffer"),
             contents: bytemuck::cast_slice(&[false as u32]),
-            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST | BufferUsages::COPY_SRC,
         });
 
         let scalar = device.create_buffer(&BufferDescriptor {
@@ -187,6 +187,44 @@ impl Matrix {
 
     pub fn is_vector(&self) -> bool {
         (self.rows == 1 || self.cols == 1) && !(self.rows == self.cols)
+    }
+
+    /// Transposes the matrix
+    pub fn transpose(&mut self) -> Result<(), Box<dyn Error>> {
+        let temp = self.rows;
+        self.rows = self.cols;
+        self.cols = temp;
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&CommandEncoderDescriptor {
+                label: Some("Transpose Command Encoder"),
+            });
+
+        let transpose = read_buffer(&self.transpose, DATA_SIZE, &self.device, &mut encoder);
+
+        self.queue.write_buffer(
+            &self.dimensions,
+            0,
+            bytemuck::cast_slice::<u32, u8>(&vec![self.rows, self.cols]),
+        );
+
+        self.queue.submit(Some(encoder.finish()));
+
+        let transpose_val: u32 = get_buffer(&transpose, &self.device)[0].to_bits();
+
+        match transpose_val {
+            0 => self
+                .queue
+                .write_buffer(&self.transpose, 0, bytemuck::cast_slice(&[1])),
+            _ => self
+                .queue
+                .write_buffer(&self.transpose, 0, bytemuck::cast_slice(&[0])),
+        }
+
+        self.queue.submit(None);
+
+        Ok(())
     }
 
     /// Dots the `source1` and `source2` matrix together and stores the output in `destination`
