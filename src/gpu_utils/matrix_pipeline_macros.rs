@@ -250,6 +250,71 @@ macro_rules! matrix_sum_pipeline {
 }
 
 #[macro_export]
+macro_rules! matrix_in_place_pipeline {
+    ($device:expr, $queue:expr, $label:expr, $pipeline:expr, $source:expr) => {
+        let mut encoder = $device.create_command_encoder(&CommandEncoderDescriptor {
+            label: Some("Matrix in Place Command Encoder"),
+        });
+
+        {
+            let (dispatch_width, dispatch_height) = compute_workgroup_size_2d(
+                ($source.rows, $source.cols),
+                (WORK_GROUP_SIZE_2D, WORK_GROUP_SIZE_2D),
+            );
+
+            // Begin the compute pass
+            let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor {
+                label: Some(&format!("{} Compute Pass", $label)),
+                timestamp_writes: None,
+            });
+
+            // Set the pipeline
+            compute_pass.set_pipeline($pipeline);
+
+            // Set the bind groups
+            compute_pass.set_bind_group(0, &$source.writable_bind_group, &[]);
+
+            compute_pass.dispatch_workgroups(dispatch_width, dispatch_height, 1);
+        }
+
+        $queue.submit(Some(encoder.finish()));
+    };
+}
+
+#[macro_export]
+macro_rules! matrix_pipeline {
+    ($device:expr, $queue:expr, $label:expr, $pipeline:expr, $source:expr, $destination:expr) => {
+        let mut encoder = $device.create_command_encoder(&CommandEncoderDescriptor {
+            label: Some("Matrix Command Encoder"),
+        });
+
+        {
+            let (dispatch_width, dispatch_height) = compute_workgroup_size_2d(
+                ($source.rows, $source.cols),
+                (WORK_GROUP_SIZE_2D, WORK_GROUP_SIZE_2D),
+            );
+
+            // Begin the compute pass
+            let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor {
+                label: Some(&format!("{} Compute Pass", $label)),
+                timestamp_writes: None,
+            });
+
+            // Set the pipeline
+            compute_pass.set_pipeline($pipeline);
+
+            // Set the bind groups
+            compute_pass.set_bind_group(0, &$source.readable_bind_group, &[]);
+            compute_pass.set_bind_group(1, &$destination.writable_bind_group, &[]);
+
+            compute_pass.dispatch_workgroups(dispatch_width, dispatch_height, 1);
+        }
+
+        $queue.submit(Some(encoder.finish()));
+    };
+}
+
+#[macro_export]
 macro_rules! create_matrix_pipelines {
     ($device:expr, $( ($shader_path:expr, $name:expr, $layout:expr, $main:expr) ),* ) => {
         {

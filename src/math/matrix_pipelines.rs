@@ -25,6 +25,7 @@ pub struct MatrixPipelines {
     matrix_matrix_in_place_pipeline_layout: PipelineLayout,
     // Custom Layouts
     matrix_in_place_pipeline_layout: PipelineLayout,
+    matrix_pipeline_layout: PipelineLayout,
 
     // Pipelines
     pub dot_pipeline: ComputePipeline,
@@ -228,6 +229,12 @@ impl MatrixPipelines {
                 push_constant_ranges: &[],
             });
 
+        let matrix_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
+            label: Some("Matrix Pipeline Layout"),
+            bind_group_layouts: &[&readable_bind_group_layout, &writable_bind_group_layout],
+            push_constant_ranges: &[],
+        });
+
         let (
             dot_pipeline,
             add_pipeline,
@@ -377,6 +384,7 @@ impl MatrixPipelines {
             matrix_sum_pipeline_layout,
             matrix_matrix_in_place_pipeline_layout,
             matrix_in_place_pipeline_layout,
+            matrix_pipeline_layout,
             dot_pipeline,
             add_pipeline,
             add_in_place_pipeline,
@@ -402,7 +410,11 @@ impl MatrixPipelines {
     }
 
     /// Creates a custom in place pipeline from the shader and returns the index of that pipeline
-    pub fn create_custom_in_place_pipeline(&mut self, device: &Device, shader: &str) -> usize {
+    pub fn create_custom_matrix_in_place_pipeline(
+        &mut self,
+        device: &Device,
+        shader: &str,
+    ) -> usize {
         let index = self.custom_pipelines.len();
 
         self.custom_pipelines.push({
@@ -412,8 +424,58 @@ impl MatrixPipelines {
             });
 
             device.create_compute_pipeline(&ComputePipelineDescriptor {
-                label: Some("Custome Compute Pipeline"),
+                label: Some("Custom Compute Pipeline"),
                 layout: Some(&self.matrix_in_place_pipeline_layout),
+                cache: None,
+                compilation_options: PipelineCompilationOptions::default(),
+                entry_point: Some("op_main"),
+                module: &pipeline_shader,
+            })
+        });
+
+        index
+    }
+
+    /// Creates a custom single op pipeline from the shader and returns the index of that pipeline
+    pub fn create_custom_matrix_pipeline(&mut self, device: &Device, shader: &str) -> usize {
+        let index = self.custom_pipelines.len();
+
+        self.custom_pipelines.push({
+            let pipeline_shader = device.create_shader_module(ShaderModuleDescriptor {
+                label: Some("Custom Pipeline Shader"),
+                source: ShaderSource::Wgsl(Cow::Borrowed(shader)),
+            });
+
+            device.create_compute_pipeline(&ComputePipelineDescriptor {
+                label: Some("Custom Compute Pipeline"),
+                layout: Some(&self.matrix_pipeline_layout),
+                cache: None,
+                compilation_options: PipelineCompilationOptions::default(),
+                entry_point: Some("op_main"),
+                module: &pipeline_shader,
+            })
+        });
+
+        index
+    }
+
+    /// Creates a custom multi op pipeline from the shader and returns the index of that pipeline
+    pub fn create_custome_matrix_matrix_pipeline(
+        &mut self,
+        device: &Device,
+        shader: &str,
+    ) -> usize {
+        let index = self.custom_pipelines.len();
+
+        self.custom_pipelines.push({
+            let pipeline_shader = device.create_shader_module(ShaderModuleDescriptor {
+                label: Some("Custom Pipeline Shader"),
+                source: ShaderSource::Wgsl(Cow::Borrowed(shader)),
+            });
+
+            device.create_compute_pipeline(&ComputePipelineDescriptor {
+                label: Some("Custom Compute Pipeline"),
+                layout: Some(&self.matrix_matrix_pipeline_layout),
                 cache: None,
                 compilation_options: PipelineCompilationOptions::default(),
                 entry_point: Some("op_main"),

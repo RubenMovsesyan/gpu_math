@@ -13,8 +13,9 @@ use crate::{
         get_buffer, read_buffer,
     },
     math_errors::MatrixExpError,
-    matrix_dot_pipline, matrix_matrix_2d_in_place_pipeline, matrix_matrix_2d_pipeline,
-    matrix_scalar_in_place_pipline, matrix_scalar_pipline, matrix_sum_pipeline,
+    matrix_dot_pipline, matrix_in_place_pipeline, matrix_matrix_2d_in_place_pipeline,
+    matrix_matrix_2d_pipeline, matrix_pipeline, matrix_scalar_in_place_pipline,
+    matrix_scalar_pipline, matrix_sum_pipeline,
 };
 
 use super::{
@@ -753,13 +754,65 @@ impl Matrix {
         matrix_sum_pipeline!(
             &matrix.device,
             &matrix.queue,
-            "Matrix Sum Pipeline",
+            "Matrix Sum",
             &matrix.pipeline_info.sum_pipeline,
             matrix,
             sum
         );
 
         Ok(sum)
+    }
+
+    // Custom pipelines
+    pub fn run_custom_matrix_in_place(
+        matrix: &Matrix,
+        pipeline_index: usize,
+    ) -> Result<(), Box<dyn Error>> {
+        matrix_in_place_pipeline!(
+            &matrix.device,
+            &matrix.queue,
+            "Matrix Custom",
+            &matrix.pipeline_info.custom_pipelines[pipeline_index],
+            matrix
+        );
+
+        Ok(())
+    }
+
+    pub fn run_custom_matrix(
+        matrix: &Matrix,
+        dest: &Matrix,
+        pipeline_index: usize,
+    ) -> Result<(), Box<dyn Error>> {
+        matrix_pipeline!(
+            &dest.device,
+            &dest.queue,
+            "Matrix Custom",
+            &dest.pipeline_info.custom_pipelines[pipeline_index],
+            matrix,
+            dest
+        );
+
+        Ok(())
+    }
+
+    pub fn run_custom_matrix_matrix(
+        source1: &Matrix,
+        source2: &Matrix,
+        dest: &Matrix,
+        pipeline_index: usize,
+    ) -> Result<(), Box<dyn Error>> {
+        matrix_matrix_2d_pipeline!(
+            &dest.device,
+            &dest.queue,
+            "Matrix Custom",
+            &dest.pipeline_info.custom_pipelines[pipeline_index],
+            source1,
+            source2,
+            dest
+        );
+
+        Ok(())
     }
 }
 
