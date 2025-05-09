@@ -460,11 +460,7 @@ impl MatrixPipelines {
     }
 
     /// Creates a custom multi op pipeline from the shader and returns the index of that pipeline
-    pub fn create_custome_matrix_matrix_pipeline(
-        &mut self,
-        device: &Device,
-        shader: &str,
-    ) -> usize {
+    pub fn create_custom_matrix_matrix_pipeline(&mut self, device: &Device, shader: &str) -> usize {
         let index = self.custom_pipelines.len();
 
         self.custom_pipelines.push({

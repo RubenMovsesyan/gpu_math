@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Display, rc::Rc};
+use std::{cell::RefCell, error::Error, fmt::Display, rc::Rc};
 
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, Buffer, BufferDescriptor, BufferUsages,
@@ -31,7 +31,7 @@ pub struct Matrix {
     // WGPU
     device: Rc<Device>,
     queue: Rc<Queue>,
-    pipeline_info: Rc<MatrixPipelines>,
+    pipeline_info: Rc<RefCell<MatrixPipelines>>,
 
     pub rows: u32,
     pub cols: u32,
@@ -102,7 +102,7 @@ impl Matrix {
 
         let readable_bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: Some("Matrix Readable Bind Group"),
-            layout: &pipeline_info.readable_bind_group_layout,
+            layout: &pipeline_info.borrow().readable_bind_group_layout,
             entries: &[
                 // Data Buffer
                 BindGroupEntry {
@@ -124,7 +124,7 @@ impl Matrix {
 
         let scalar_bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: Some("Matrix Scalar Bind Group"),
-            layout: &pipeline_info.scalar_bind_group_layout,
+            layout: &pipeline_info.borrow().scalar_bind_group_layout,
             entries: &[
                 // Scalar Uniform
                 BindGroupEntry {
@@ -136,7 +136,7 @@ impl Matrix {
 
         let sum_bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: Some("Matrix Sum Bind Group"),
-            layout: &pipeline_info.sum_bind_group_layout,
+            layout: &pipeline_info.borrow().sum_bind_group_layout,
             entries: &[
                 // Sub Buffer
                 BindGroupEntry {
@@ -148,7 +148,7 @@ impl Matrix {
 
         let writable_bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: Some("Matrix Writable Bind Group"),
-            layout: &pipeline_info.writable_bind_group_layout,
+            layout: &pipeline_info.borrow().writable_bind_group_layout,
             entries: &[
                 // Data Buffer
                 BindGroupEntry {
@@ -246,7 +246,7 @@ impl Matrix {
             &destination.device,
             &destination.queue,
             "Matrix Dot",
-            &destination.pipeline_info.dot_pipeline,
+            &destination.pipeline_info.borrow().dot_pipeline,
             source1,
             source2,
             destination
@@ -279,7 +279,7 @@ impl Matrix {
             &destination.device,
             &destination.queue,
             "Matrix Add",
-            &destination.pipeline_info.add_pipeline,
+            &destination.pipeline_info.borrow().add_pipeline,
             source1,
             source2,
             destination
@@ -316,7 +316,7 @@ impl Matrix {
             &destination.device,
             &destination.queue,
             "Matrix Vectored Add",
-            &destination.pipeline_info.vectored_add_pipeline,
+            &destination.pipeline_info.borrow().vectored_add_pipeline,
             matrix,
             vector,
             destination
@@ -345,7 +345,7 @@ impl Matrix {
             &matrix1.device,
             &matrix1.queue,
             "Matrix Add in Place",
-            &matrix1.pipeline_info.add_in_place_pipeline,
+            &matrix1.pipeline_info.borrow().add_in_place_pipeline,
             matrix1,
             matrix2
         );
@@ -377,7 +377,7 @@ impl Matrix {
             &matrix.device,
             &matrix.queue,
             "Matrix Vectored Add In Place",
-            &matrix.pipeline_info.vectored_add_in_place_pipeline,
+            &matrix.pipeline_info.borrow().vectored_add_in_place_pipeline,
             matrix,
             vector
         );
@@ -414,7 +414,7 @@ impl Matrix {
             &destination.device,
             &destination.queue,
             "Matrix Add Scalar",
-            &source.pipeline_info.add_scalar_pipeline,
+            &source.pipeline_info.borrow().add_scalar_pipeline,
             source,
             destination
         );
@@ -446,7 +446,7 @@ impl Matrix {
             &destination.device,
             &destination.queue,
             "Matrix Sub",
-            &destination.pipeline_info.sub_pipeline,
+            &destination.pipeline_info.borrow().sub_pipeline,
             source1,
             source2,
             destination
@@ -483,7 +483,7 @@ impl Matrix {
             &destination.device,
             &destination.queue,
             "Matrix Vectored Add",
-            &destination.pipeline_info.vectored_sub_pipeline,
+            &destination.pipeline_info.borrow().vectored_sub_pipeline,
             matrix,
             vector,
             destination
@@ -512,7 +512,7 @@ impl Matrix {
             &matrix1.device,
             &matrix1.queue,
             "Matrix Sub in Place",
-            &matrix1.pipeline_info.sub_in_place_pipeline,
+            &matrix1.pipeline_info.borrow().sub_in_place_pipeline,
             matrix1,
             matrix2
         );
@@ -544,7 +544,7 @@ impl Matrix {
             &matrix.device,
             &matrix.queue,
             "Matrix Vectored Add In Place",
-            &matrix.pipeline_info.vectored_sub_in_place_pipeline,
+            &matrix.pipeline_info.borrow().vectored_sub_in_place_pipeline,
             matrix,
             vector
         );
@@ -581,7 +581,7 @@ impl Matrix {
             &destination.device,
             &destination.queue,
             "Matrix Sub Scalar",
-            &source.pipeline_info.sub_scalar_pipeline,
+            &source.pipeline_info.borrow().sub_scalar_pipeline,
             source,
             destination
         );
@@ -618,7 +618,7 @@ impl Matrix {
             &destination.device,
             &destination.queue,
             "Matrix Mult Scalar",
-            &source.pipeline_info.mult_scalar_pipeline,
+            &source.pipeline_info.borrow().mult_scalar_pipeline,
             source,
             destination
         );
@@ -636,7 +636,7 @@ impl Matrix {
             &matrix.device,
             &matrix.queue,
             "Matrix Mult Scalar In Place",
-            &matrix.pipeline_info.mult_scalar_in_place_pipeline,
+            &matrix.pipeline_info.borrow().mult_scalar_in_place_pipeline,
             matrix
         );
 
@@ -667,7 +667,7 @@ impl Matrix {
             &destination.device,
             &destination.queue,
             "Matrix Mult",
-            &destination.pipeline_info.mult_pipeline,
+            &destination.pipeline_info.borrow().mult_pipeline,
             source1,
             source2,
             destination
@@ -696,7 +696,7 @@ impl Matrix {
             &matrix1.device,
             &matrix1.queue,
             "Matrix Mult in Place",
-            &matrix1.pipeline_info.mult_in_place_pipeline,
+            &matrix1.pipeline_info.borrow().mult_in_place_pipeline,
             matrix1,
             matrix2
         );
@@ -723,7 +723,7 @@ impl Matrix {
             &destination.device,
             &destination.queue,
             "Matrix Exp",
-            &matrix.pipeline_info.exp_pipeline,
+            &matrix.pipeline_info.borrow().exp_pipeline,
             matrix,
             destination
         );
@@ -736,7 +736,7 @@ impl Matrix {
             &matrix.device,
             &matrix.queue,
             "Matrix Exp In Place",
-            &matrix.pipeline_info.exp_in_place_pipeline,
+            &matrix.pipeline_info.borrow().exp_in_place_pipeline,
             matrix
         );
 
@@ -755,7 +755,7 @@ impl Matrix {
             &matrix.device,
             &matrix.queue,
             "Matrix Sum",
-            &matrix.pipeline_info.sum_pipeline,
+            &matrix.pipeline_info.borrow().sum_pipeline,
             matrix,
             sum
         );
@@ -772,7 +772,7 @@ impl Matrix {
             &matrix.device,
             &matrix.queue,
             "Matrix Custom",
-            &matrix.pipeline_info.custom_pipelines[pipeline_index],
+            &matrix.pipeline_info.borrow().custom_pipelines[pipeline_index],
             matrix
         );
 
@@ -788,7 +788,7 @@ impl Matrix {
             &dest.device,
             &dest.queue,
             "Matrix Custom",
-            &dest.pipeline_info.custom_pipelines[pipeline_index],
+            &dest.pipeline_info.borrow().custom_pipelines[pipeline_index],
             matrix,
             dest
         );
@@ -806,7 +806,7 @@ impl Matrix {
             &dest.device,
             &dest.queue,
             "Matrix Custom",
-            &dest.pipeline_info.custom_pipelines[pipeline_index],
+            &dest.pipeline_info.borrow().custom_pipelines[pipeline_index],
             source1,
             source2,
             dest

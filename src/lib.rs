@@ -1,7 +1,7 @@
 #![recursion_limit = "512"]
 mod gpu_utils;
 
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 // Logging
 #[allow(unused_imports)]
@@ -35,7 +35,7 @@ pub struct GpuMath {
     queue: Rc<Queue>,
 
     // Math Pipelines
-    pub matrix_pipelines: Rc<MatrixPipelines>,
+    matrix_pipelines: Rc<RefCell<MatrixPipelines>>,
 }
 
 impl GpuMath {
@@ -73,8 +73,11 @@ impl GpuMath {
         let (device, queue) = (Rc::new(device), Rc::new(queue));
 
         // Create the pipelines for matrix math
-        let matrix_pipelines =
-            unsafe { Rc::new(MatrixPipelines::init(&device).unwrap_unchecked()) };
+        let matrix_pipelines = unsafe {
+            Rc::new(RefCell::new(
+                MatrixPipelines::init(&device).unwrap_unchecked(),
+            ))
+        };
 
         Self {
             instance,
@@ -83,6 +86,24 @@ impl GpuMath {
             queue,
             matrix_pipelines,
         }
+    }
+
+    pub fn create_custom_matrix_in_place_pipeline(&mut self, shader: &str) -> usize {
+        self.matrix_pipelines
+            .borrow_mut()
+            .create_custom_matrix_in_place_pipeline(&self.device, shader)
+    }
+
+    pub fn create_custom_matrix_pipeline(&mut self, shader: &str) -> usize {
+        self.matrix_pipelines
+            .borrow_mut()
+            .create_custom_matrix_pipeline(&self.device, shader)
+    }
+
+    pub fn create_custome_matrix_matrix_pipeline(&mut self, shader: &str) -> usize {
+        self.matrix_pipelines
+            .borrow_mut()
+            .create_custom_matrix_matrix_pipeline(&self.device, shader)
     }
 }
 
