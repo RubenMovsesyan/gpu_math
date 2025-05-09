@@ -768,6 +768,26 @@ impl Matrix {
 
         Ok(())
     }
+
+    pub fn run_custome_matrix_scalar_in_place(
+        matrix: &Matrix,
+        scalar: f32,
+        pipeline_index: usize,
+    ) -> Result<()> {
+        matrix
+            .queue
+            .write_buffer(&matrix.scalar, 0, bytemuck::cast_slice(&[scalar]));
+
+        matrix_scalar_in_place_pipline!(
+            &matrix.device,
+            &matrix.queue,
+            "Matrix Custom",
+            &matrix.pipeline_info.borrow().custom_pipelines[pipeline_index],
+            matrix
+        );
+
+        Ok(())
+    }
 }
 
 impl Drop for Matrix {
