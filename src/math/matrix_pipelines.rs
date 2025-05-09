@@ -34,9 +34,11 @@ pub struct MatrixPipelines {
     pub add_pipeline: ComputePipeline,
     pub add_in_place_pipeline: ComputePipeline,
     pub add_scalar_pipeline: ComputePipeline,
+    pub add_scalar_in_place_pipeline: ComputePipeline,
     pub sub_pipeline: ComputePipeline,
     pub sub_in_place_pipeline: ComputePipeline,
     pub sub_scalar_pipeline: ComputePipeline,
+    pub sub_scalar_in_place_pipeline: ComputePipeline,
     pub mult_scalar_pipeline: ComputePipeline,
     pub mult_scalar_in_place_pipeline: ComputePipeline,
     pub mult_pipeline: ComputePipeline,
@@ -242,6 +244,7 @@ impl MatrixPipelines {
             add_pipeline,
             add_in_place_pipeline,
             add_scalar_pipeline,
+            add_scalar_in_place_pipeline,
             sub_pipeline,
             sub_in_place_pipeline,
             sub_scalar_pipeline,
@@ -274,6 +277,12 @@ impl MatrixPipelines {
                 "Matrix Add Scalar Pipeline",
                 matrix_scalar_pipeline_layout,
                 "add_scalar_main"
+            ),
+            (
+                "shaders/adding_scalar_in_place.wgsl",
+                "Matrix Add Scalar In Place Pipeline",
+                matrix_scalar_in_place_pipeline_layout,
+                "add_scalar_in_place_main"
             ),
             (
                 "shaders/subing.wgsl",
@@ -354,7 +363,7 @@ impl MatrixPipelines {
         );
 
         // Extra pipelines
-        let (exp_pipeline, exp_in_place_pipeline, sum_pipeline) = create_matrix_pipelines!(
+        let (exp_pipeline, exp_in_place_pipeline, sum_pipeline, sub_scalar_in_place_pipeline) = create_matrix_pipelines!(
             device,
             (
                 "shaders/exp.wgsl",
@@ -373,6 +382,12 @@ impl MatrixPipelines {
                 "Matrix Sum Pipeline",
                 matrix_sum_pipeline_layout,
                 "sum_main"
+            ),
+            (
+                "shaders/subing_scalar_in_place.wgsl",
+                "Matrix Sub Scalar In Place Pipeline",
+                matrix_scalar_in_place_pipeline_layout,
+                "sub_scalar_in_place_main"
             )
         );
 
@@ -392,9 +407,11 @@ impl MatrixPipelines {
             add_pipeline,
             add_in_place_pipeline,
             add_scalar_pipeline,
+            add_scalar_in_place_pipeline,
             sub_pipeline,
             sub_in_place_pipeline,
             sub_scalar_pipeline,
+            sub_scalar_in_place_pipeline,
             mult_scalar_pipeline,
             mult_scalar_in_place_pipeline,
             mult_pipeline,

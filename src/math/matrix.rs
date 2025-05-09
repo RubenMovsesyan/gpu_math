@@ -403,6 +403,25 @@ impl Matrix {
         Ok(())
     }
 
+    /// Adds the scalar value to `source` and stores it in `source`
+    pub fn add_scalar_in_place(source: &Matrix, scalar: f32) -> Result<()> {
+        // write the scalar to the scalar buffer
+        source
+            .queue
+            .write_buffer(&source.scalar, 0, bytemuck::cast_slice(&[scalar]));
+
+        // Run the add scalar pipeline
+        matrix_scalar_in_place_pipline!(
+            &source.device,
+            &source.queue,
+            "Matrix Add Scalar",
+            &source.pipeline_info.borrow().add_scalar_in_place_pipeline,
+            source
+        );
+
+        Ok(())
+    }
+
     /// Subtracts `source2` from `source1` and stores it in `destination`
     pub fn sub(source1: &Matrix, source2: &Matrix, destination: &Matrix) -> Result<()> {
         // Make sure that the gpu is initialzied
@@ -553,6 +572,25 @@ impl Matrix {
             &source.pipeline_info.borrow().sub_scalar_pipeline,
             source,
             destination
+        );
+
+        Ok(())
+    }
+
+    /// Subtracts the scalar value from `source` and stores it in `source`
+    pub fn sub_scalar_in_place(source: &Matrix, scalar: f32) -> Result<()> {
+        // write the scalar to the scalar buffer
+        source
+            .queue
+            .write_buffer(&source.scalar, 0, bytemuck::cast_slice(&[scalar]));
+
+        // Run the add scalar pipeline
+        matrix_scalar_in_place_pipline!(
+            &source.device,
+            &source.queue,
+            "Matrix Add Scalar",
+            &source.pipeline_info.borrow().sub_scalar_in_place_pipeline,
+            source
         );
 
         Ok(())
