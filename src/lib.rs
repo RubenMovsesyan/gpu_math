@@ -94,6 +94,12 @@ impl GpuMath {
             .create_custom_matrix_in_place_pipeline(&self.device, shader)
     }
 
+    pub fn create_custom_matrix_scalar_in_place_pipeline(&mut self, shader: &str) -> usize {
+        self.matrix_pipelines
+            .borrow_mut()
+            .create_custom_matrix_scalar_in_place_pipeline(&self.device, shader)
+    }
+
     pub fn create_custom_matrix_pipeline(&mut self, shader: &str) -> usize {
         self.matrix_pipelines
             .borrow_mut()

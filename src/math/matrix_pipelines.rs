@@ -21,6 +21,7 @@ pub struct MatrixPipelines {
     // Pipeline Layouts
     matrix_matrix_pipeline_layout: PipelineLayout,
     matrix_scalar_pipeline_layout: PipelineLayout,
+    matrix_scalar_in_place_pipeline_layout: PipelineLayout,
     matrix_sum_pipeline_layout: PipelineLayout,
     matrix_matrix_in_place_pipeline_layout: PipelineLayout,
     // Custom Layouts
@@ -381,6 +382,7 @@ impl MatrixPipelines {
             writable_bind_group_layout,
             matrix_matrix_pipeline_layout,
             matrix_scalar_pipeline_layout,
+            matrix_scalar_in_place_pipeline_layout,
             matrix_sum_pipeline_layout,
             matrix_matrix_in_place_pipeline_layout,
             matrix_in_place_pipeline_layout,
@@ -426,6 +428,33 @@ impl MatrixPipelines {
             device.create_compute_pipeline(&ComputePipelineDescriptor {
                 label: Some("Custom Compute Pipeline"),
                 layout: Some(&self.matrix_in_place_pipeline_layout),
+                cache: None,
+                compilation_options: PipelineCompilationOptions::default(),
+                entry_point: Some("op_main"),
+                module: &pipeline_shader,
+            })
+        });
+
+        index
+    }
+
+    /// Creates a custom matrix scalar in place pipeline from the shader and returns the index of that pipeline
+    pub fn create_custom_matrix_scalar_in_place_pipeline(
+        &mut self,
+        device: &Device,
+        shader: &str,
+    ) -> usize {
+        let index = self.custom_pipelines.len();
+
+        self.custom_pipelines.push({
+            let pipeline_shader = device.create_shader_module(ShaderModuleDescriptor {
+                label: Some("Custome Pipeline Shader"),
+                source: ShaderSource::Wgsl(Cow::Borrowed(shader)),
+            });
+
+            device.create_compute_pipeline(&ComputePipelineDescriptor {
+                label: Some("Custome Compute Pipeline"),
+                layout: Some(&self.matrix_scalar_in_place_pipeline_layout),
                 cache: None,
                 compilation_options: PipelineCompilationOptions::default(),
                 entry_point: Some("op_main"),
