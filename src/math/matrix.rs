@@ -769,7 +769,7 @@ impl Matrix {
         Ok(())
     }
 
-    pub fn run_custome_matrix_scalar_in_place(
+    pub fn run_custom_matrix_scalar_in_place(
         matrix: &Matrix,
         scalar: f32,
         pipeline_index: usize,
