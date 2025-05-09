@@ -27,6 +27,7 @@ use wgpu::{
 // static mut GPU_MATHS: Option<GpuMath> = None;
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct GpuMath {
     instance: Instance,
     adapter: Adapter,
