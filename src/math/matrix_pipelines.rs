@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use anyhow::Result;
 use wgpu::{
     BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
     BufferBindingType, ComputePipeline, ComputePipelineDescriptor, Device,
@@ -7,7 +8,7 @@ use wgpu::{
     ShaderSource, ShaderStages, include_wgsl,
 };
 
-use crate::{create_matrix_pipelines, errors::GpuMathNotInitializedError};
+use crate::create_matrix_pipelines;
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -55,7 +56,7 @@ pub struct MatrixPipelines {
 }
 
 impl MatrixPipelines {
-    pub fn init(device: &Device) -> Result<Self, GpuMathNotInitializedError> {
+    pub fn init(device: &Device) -> Result<Self> {
         // Create the readable bind group layout for the pipelines
         let readable_bind_group_layout =
             device.create_bind_group_layout(&BindGroupLayoutDescriptor {

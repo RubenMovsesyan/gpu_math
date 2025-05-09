@@ -1,5 +1,6 @@
-use std::{cell::RefCell, error::Error, fmt::Display, rc::Rc};
+use std::{cell::RefCell, fmt::Display, rc::Rc};
 
+use anyhow::{Result, anyhow};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, Buffer, BufferDescriptor, BufferUsages,
     CommandEncoderDescriptor, ComputePassDescriptor, Device, Maintain, Queue,
@@ -52,11 +53,7 @@ pub struct Matrix {
 impl Matrix {
     /// Creates a new matrix with a specified `shape` and fills it with `data` if provided
     /// The Matrix will not be transposed by default
-    pub fn new(
-        gpu_math: &GpuMath,
-        shape: (u32, u32),
-        data: Option<Vec<f32>>,
-    ) -> Result<Self, Box<dyn Error>> {
+    pub fn new(gpu_math: &GpuMath, shape: (u32, u32), data: Option<Vec<f32>>) -> Result<Self> {
         let device = gpu_math.device.clone();
         let queue = gpu_math.queue.clone();
         let pipeline_info = gpu_math.matrix_pipelines.clone();
@@ -191,7 +188,7 @@ impl Matrix {
     }
 
     /// Transposes the matrix
-    pub fn transpose(&mut self) -> Result<(), Box<dyn Error>> {
+    pub fn transpose(&mut self) -> Result<()> {
         let temp = self.rows;
         self.rows = self.cols;
         self.cols = temp;
@@ -229,15 +226,11 @@ impl Matrix {
     }
 
     /// Dots the `source1` and `source2` matrix together and stores the output in `destination`
-    pub fn dot(
-        source1: &Matrix,
-        source2: &Matrix,
-        destination: &Matrix,
-    ) -> Result<(), Box<dyn Error>> {
+    pub fn dot(source1: &Matrix, source2: &Matrix, destination: &Matrix) -> Result<()> {
         // Make sure that the gpu is initialized
         // Check to see if the matrix rows and columns line up
         if source1.cols != source2.rows {
-            return Err(Box::new(MatrixDotError(
+            return Err(anyhow!(MatrixDotError(
                 "Source 1 cols do not match Source 2 rows in Matrix::dot".to_string(),
             )));
         }
@@ -256,20 +249,16 @@ impl Matrix {
     }
 
     /// Adds the matrices in `source1` and `source2` and stores it in `destination`
-    pub fn add(
-        source1: &Matrix,
-        source2: &Matrix,
-        destination: &Matrix,
-    ) -> Result<(), Box<dyn Error>> {
+    pub fn add(source1: &Matrix, source2: &Matrix, destination: &Matrix) -> Result<()> {
         // Make sure that the gpu is initialzied
         // Check to see if the matrix rows and coloumns are the same
         if source1.cols != source2.cols || source1.cols != destination.cols {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Source 1 cols do not match Source 2 cols or destinaiton cols".to_string(),
             )));
         }
         if source1.rows != source2.rows || source1.rows != destination.rows {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Source 1 rows do not match Source 2 rows or destinaiton rows".to_string(),
             )));
         }
@@ -289,14 +278,10 @@ impl Matrix {
     }
 
     /// Adds the contents of `vector` to `matrix` and stores it in `destination`
-    pub fn vectored_add(
-        matrix: &Matrix,
-        vector: &Matrix,
-        destination: &Matrix,
-    ) -> Result<(), Box<dyn Error>> {
+    pub fn vectored_add(matrix: &Matrix, vector: &Matrix, destination: &Matrix) -> Result<()> {
         // Check if the `vector` matrix is actually a vector
         if !vector.is_vector() {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Vector matrix is not a vector".to_string(),
             )));
         }
@@ -307,7 +292,7 @@ impl Matrix {
             || vector.rows == matrix.cols
             || vector.cols == matrix.rows)
         {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Vector dimensions do not match Matrix".to_string(),
             )));
         }
@@ -326,16 +311,16 @@ impl Matrix {
     }
 
     /// Adds the contents of `matrix2` to `matrix1`
-    pub fn add_in_place(matrix1: &Matrix, matrix2: &Matrix) -> Result<(), Box<dyn Error>> {
+    pub fn add_in_place(matrix1: &Matrix, matrix2: &Matrix) -> Result<()> {
         // Make sure that the rows and columns of both matrices match
         if matrix1.cols != matrix2.cols {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Matrix 1 cols do not match Matrix 2 cols".to_string(),
             )));
         }
 
         if matrix1.rows != matrix2.rows {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Matrix 1 rows do not match Matrix 2 rows".to_string(),
             )));
         }
@@ -354,10 +339,10 @@ impl Matrix {
     }
 
     /// Adds the contents of `vector` to `matrix`
-    pub fn vectored_add_in_place(matrix: &Matrix, vector: &Matrix) -> Result<(), Box<dyn Error>> {
+    pub fn vectored_add_in_place(matrix: &Matrix, vector: &Matrix) -> Result<()> {
         // Check if the `vector` matrix is actually a vector
         if !vector.is_vector() {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Vector matrix is not a vector".to_string(),
             )));
         }
@@ -368,7 +353,7 @@ impl Matrix {
             || vector.rows == matrix.cols
             || vector.cols == matrix.rows)
         {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Vector dimensions do not match Matrix".to_string(),
             )));
         }
@@ -386,20 +371,16 @@ impl Matrix {
     }
 
     /// Adds the scalar value to `source` and stores it in `destination`
-    pub fn add_scalar(
-        source: &Matrix,
-        scalar: f32,
-        destination: &Matrix,
-    ) -> Result<(), Box<dyn Error>> {
+    pub fn add_scalar(source: &Matrix, scalar: f32, destination: &Matrix) -> Result<()> {
         // Check to make sure the source and destination matrices are the same size
         if source.cols != destination.cols {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Source cols do not match Destination cols".to_string(),
             )));
         }
 
         if source.rows != destination.rows {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Source rows do not match Destination rows".to_string(),
             )));
         }
@@ -423,20 +404,16 @@ impl Matrix {
     }
 
     /// Subtracts `source2` from `source1` and stores it in `destination`
-    pub fn sub(
-        source1: &Matrix,
-        source2: &Matrix,
-        destination: &Matrix,
-    ) -> Result<(), Box<dyn Error>> {
+    pub fn sub(source1: &Matrix, source2: &Matrix, destination: &Matrix) -> Result<()> {
         // Make sure that the gpu is initialzied
         // Check to see if the matrix rows and coloumns are the same
         if source1.cols != source2.cols || source1.cols != destination.cols {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Source 1 cols do not match Source 2 cols or destinaiton cols".to_string(),
             )));
         }
         if source1.rows != source2.rows || source1.rows != destination.rows {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Source 1 rows do not match Source 2 rows or destinaiton rows".to_string(),
             )));
         }
@@ -456,14 +433,10 @@ impl Matrix {
     }
 
     /// Subtracts the contents of `vector` from `matrix` and stores it in `destination`
-    pub fn vectored_sub(
-        matrix: &Matrix,
-        vector: &Matrix,
-        destination: &Matrix,
-    ) -> Result<(), Box<dyn Error>> {
+    pub fn vectored_sub(matrix: &Matrix, vector: &Matrix, destination: &Matrix) -> Result<()> {
         // Check if the `vector` matrix is actually a vector
         if !vector.is_vector() {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Vector matrix is not a vector".to_string(),
             )));
         }
@@ -474,7 +447,7 @@ impl Matrix {
             || vector.rows == matrix.cols
             || vector.cols == matrix.rows)
         {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Vector dimensions do not match Matrix".to_string(),
             )));
         }
@@ -493,16 +466,16 @@ impl Matrix {
     }
 
     /// Subtracts the contents of `matrix2` from `matrix1`
-    pub fn sub_in_place(matrix1: &Matrix, matrix2: &Matrix) -> Result<(), Box<dyn Error>> {
+    pub fn sub_in_place(matrix1: &Matrix, matrix2: &Matrix) -> Result<()> {
         // Make sure that the rows and columns of both matrices match
         if matrix1.cols != matrix2.cols {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Matrix 1 cols do not match Matrix 2 cols".to_string(),
             )));
         }
 
         if matrix1.rows != matrix2.rows {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Matrix 1 rows do not match Matrix 2 rows".to_string(),
             )));
         }
@@ -521,10 +494,10 @@ impl Matrix {
     }
 
     /// Adds the contents of `vector` to `matrix`
-    pub fn vectored_sub_in_place(matrix: &Matrix, vector: &Matrix) -> Result<(), Box<dyn Error>> {
+    pub fn vectored_sub_in_place(matrix: &Matrix, vector: &Matrix) -> Result<()> {
         // Check if the `vector` matrix is actually a vector
         if !vector.is_vector() {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Vector matrix is not a vector".to_string(),
             )));
         }
@@ -535,7 +508,7 @@ impl Matrix {
             || vector.rows == matrix.cols
             || vector.cols == matrix.rows)
         {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Vector dimensions do not match Matrix".to_string(),
             )));
         }
@@ -553,20 +526,16 @@ impl Matrix {
     }
 
     /// Subtracts the scalar value from `source` and stores it in `destination`
-    pub fn sub_scalar(
-        source: &Matrix,
-        scalar: f32,
-        destination: &Matrix,
-    ) -> Result<(), Box<dyn Error>> {
+    pub fn sub_scalar(source: &Matrix, scalar: f32, destination: &Matrix) -> Result<()> {
         // Check to make sure the source and destination matrices are the same size
         if source.cols != destination.cols {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Source cols do not match Destination cols".to_string(),
             )));
         }
 
         if source.rows != destination.rows {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Source rows do not match Destination rows".to_string(),
             )));
         }
@@ -590,20 +559,16 @@ impl Matrix {
     }
 
     /// Multiplies the scalar value to `source` and stores it in `destination`
-    pub fn mult_scalar(
-        source: &Matrix,
-        scalar: f32,
-        destination: &Matrix,
-    ) -> Result<(), Box<dyn Error>> {
+    pub fn mult_scalar(source: &Matrix, scalar: f32, destination: &Matrix) -> Result<()> {
         // Check to make sure the source and destination matrices are the same size
         if source.cols != destination.cols {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Source cols do not match Destination cols".to_string(),
             )));
         }
 
         if source.rows != destination.rows {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Source rows do not match Destination rows".to_string(),
             )));
         }
@@ -627,7 +592,7 @@ impl Matrix {
     }
 
     /// Multiplies the `matrix` by the `scalar` in place
-    pub fn mult_scalar_in_place(matrix: &Matrix, scalar: f32) -> Result<(), Box<dyn Error>> {
+    pub fn mult_scalar_in_place(matrix: &Matrix, scalar: f32) -> Result<()> {
         matrix
             .queue
             .write_buffer(&matrix.scalar, 0, bytemuck::cast_slice(&[scalar]));
@@ -644,20 +609,16 @@ impl Matrix {
     }
 
     /// Multiplies every element of `source1` by `source2` and stores it in `destination`
-    pub fn mult(
-        source1: &Matrix,
-        source2: &Matrix,
-        destination: &Matrix,
-    ) -> Result<(), Box<dyn Error>> {
+    pub fn mult(source1: &Matrix, source2: &Matrix, destination: &Matrix) -> Result<()> {
         // Make sure that the gpu is initialzied
         // Check to see if the matrix rows and coloumns are the same
         if source1.cols != source2.cols || source1.cols != destination.cols {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Source 1 cols do not match Source 2 cols or destinaiton cols".to_string(),
             )));
         }
         if source1.rows != source2.rows || source1.rows != destination.rows {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Source 1 rows do not match Source 2 rows or destinaiton rows".to_string(),
             )));
         }
@@ -677,16 +638,16 @@ impl Matrix {
     }
 
     /// Multiplies the contents of `matrix2` to `matrix1`
-    pub fn mult_in_place(matrix1: &Matrix, matrix2: &Matrix) -> Result<(), Box<dyn Error>> {
+    pub fn mult_in_place(matrix1: &Matrix, matrix2: &Matrix) -> Result<()> {
         // Make sure that the rows and columns of both matrices match
         if matrix1.cols != matrix2.cols {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Matrix 1 cols do not match Matrix 2 cols".to_string(),
             )));
         }
 
         if matrix1.rows != matrix2.rows {
-            return Err(Box::new(MatrixAddError(
+            return Err(anyhow!(MatrixAddError(
                 "Matrix 1 rows do not match Matrix 2 rows".to_string(),
             )));
         }
@@ -705,16 +666,16 @@ impl Matrix {
     }
 
     /// Exponents the `matrix` and stores it in `destination`
-    pub fn exp(matrix: &Matrix, destination: &Matrix) -> Result<(), Box<dyn Error>> {
+    pub fn exp(matrix: &Matrix, destination: &Matrix) -> Result<()> {
         // Make sure that the rows and columns of both matrices match
         if matrix.cols != destination.cols {
-            return Err(Box::new(MatrixExpError(
+            return Err(anyhow!(MatrixExpError(
                 "Matrix cols do not match Destination cols".to_string(),
             )));
         }
 
         if matrix.rows != destination.rows {
-            return Err(Box::new(MatrixExpError(
+            return Err(anyhow!(MatrixExpError(
                 "Matrix rows do not match Destination rows".to_string(),
             )));
         }
@@ -731,7 +692,7 @@ impl Matrix {
         Ok(())
     }
 
-    pub fn exp_in_place(matrix: &Matrix) -> Result<(), Box<dyn Error>> {
+    pub fn exp_in_place(matrix: &Matrix) -> Result<()> {
         matrix_scalar_in_place_pipline!(
             &matrix.device,
             &matrix.queue,
@@ -743,7 +704,7 @@ impl Matrix {
         Ok(())
     }
 
-    pub fn sum(matrix: &Matrix) -> Result<f32, Box<dyn Error>> {
+    pub fn sum(matrix: &Matrix) -> Result<f32> {
         #[allow(unused_assignments)]
         let mut sum = 0.0;
 
@@ -764,10 +725,7 @@ impl Matrix {
     }
 
     // Custom pipelines
-    pub fn run_custom_matrix_in_place(
-        matrix: &Matrix,
-        pipeline_index: usize,
-    ) -> Result<(), Box<dyn Error>> {
+    pub fn run_custom_matrix_in_place(matrix: &Matrix, pipeline_index: usize) -> Result<()> {
         matrix_in_place_pipeline!(
             &matrix.device,
             &matrix.queue,
@@ -779,11 +737,7 @@ impl Matrix {
         Ok(())
     }
 
-    pub fn run_custom_matrix(
-        matrix: &Matrix,
-        dest: &Matrix,
-        pipeline_index: usize,
-    ) -> Result<(), Box<dyn Error>> {
+    pub fn run_custom_matrix(matrix: &Matrix, dest: &Matrix, pipeline_index: usize) -> Result<()> {
         matrix_pipeline!(
             &dest.device,
             &dest.queue,
@@ -801,7 +755,7 @@ impl Matrix {
         source2: &Matrix,
         dest: &Matrix,
         pipeline_index: usize,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<()> {
         matrix_matrix_2d_pipeline!(
             &dest.device,
             &dest.queue,
