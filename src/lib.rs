@@ -35,7 +35,7 @@ pub struct GpuMath {
     queue: Rc<Queue>,
 
     // Math Pipelines
-    matrix_pipelines: Rc<MatrixPipelines>,
+    pub matrix_pipelines: Rc<MatrixPipelines>,
 }
 
 impl GpuMath {
