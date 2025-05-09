@@ -762,6 +762,23 @@ impl Matrix {
         Ok(sum)
     }
 
+    pub fn get_inner(&mut self) -> Result<Vec<f32>> {
+        let mut encoder = self
+            .device
+            .create_command_encoder(&CommandEncoderDescriptor { label: None });
+
+        let vals = read_buffer(
+            &self.data,
+            (self.rows * self.cols) as u64,
+            &self.device,
+            &mut encoder,
+        );
+
+        self.queue.submit(Some(encoder.finish()));
+
+        Ok(get_buffer(&vals, &self.device))
+    }
+
     // Custom pipelines
     pub fn run_custom_matrix_in_place(matrix: &Matrix, pipeline_index: usize) -> Result<()> {
         matrix_in_place_pipeline!(
